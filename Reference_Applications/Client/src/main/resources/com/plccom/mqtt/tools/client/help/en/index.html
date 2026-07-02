@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PLCcom MQTT Client Tool Help</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="brand"><span class="logo-mark">PLCcom</span><span>MQTT Client Tool</span></div>
+    <h1>Client Tool Help</h1>
+    <p class="lead">This local help explains the standalone test application and the MQTT terms behind it: when a field is useful, when it can stay empty and what behavior to expect.</p>
+  </header>
+  <main class="shell">
+    <nav class="nav">
+      <strong>Contents</strong>
+      <a href="#purpose">Purpose</a>
+      <a href="#connect">Connect</a>
+      <a href="#security">TLS and certificates</a>
+      <a href="#last-will">Last Will / Testament</a>
+      <a href="#publish-basic">Publish basics</a>
+      <a href="#publish-mqtt5">Publish MQTT 5 fields</a>
+      <a href="#subscribe-basic">Subscribe basics</a>
+      <a href="#subscribe-mqtt5">Subscribe MQTT 5 options</a>
+      <a href="#request">Request / Response</a>
+      <a href="#messages">Messages and log</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+    </nav>
+    <div class="content">
+      <section id="purpose">
+        <h2>What is this tool for?</h2>
+        <p>The Client Tool is a graphical reference application for the PLCcom MQTT high-level client. It is a quick place to try connections, publishing, subscriptions, QoS, retained messages, MQTT 5 properties and diagnostics.</p>
+        <div class="note">Inputs are stored in the PLCcom MQTT user profile. Sensitive values such as license data, MQTT password and certificate password are not stored as plain text.</div>
+      </section>
+
+      <section id="connect">
+        <h2>Connect</h2>
+        <ol>
+          <li>Enter license data if required.</li>
+          <li>Enter an endpoint, for example <code>mqtt://127.0.0.1:1883</code>.</li>
+          <li>Keep protocol <code>AUTO</code> unless you intentionally test MQTT 5.0 or MQTT 3.1.1.</li>
+          <li>Put user name and password into the separate fields, not into the URI.</li>
+          <li>Click <strong>Connect</strong>.</li>
+        </ol>
+        <h3>Endpoint assistant</h3>
+        <p>The small <code>...</code> button opens an assistant for transport, host, port and optional WebSocket path. It writes the resulting URI back into the single endpoint field.</p>
+        <table class="table">
+          <tr><th>Scheme</th><th>Meaning</th><th>Typical port</th></tr>
+          <tr><td><code>mqtt://</code></td><td>MQTT over TCP without TLS.</td><td>1883</td></tr>
+          <tr><td><code>mqtts://</code></td><td>MQTT over TLS.</td><td>8883</td></tr>
+          <tr><td><code>ws://</code></td><td>MQTT over WebSocket without TLS.</td><td>8080</td></tr>
+          <tr><td><code>wss://</code></td><td>MQTT over secure WebSocket.</td><td>8443</td></tr>
+        </table>
+        <div class="warning">TCP/TLS endpoints must not contain a WebSocket path. Use <code>ws://</code> or <code>wss://</code> for paths such as <code>/mqtt</code>.</div>
+      </section>
+
+      <section id="security">
+        <h2>TLS and certificates</h2>
+        <p>For <code>mqtts://</code> and <code>wss://</code>, the tool validates the broker certificate through the fixed client PKI store below <code>PLCcom/Mqtt/Client/pki</code>. Unknown certificates are placed into <code>rejected/certs</code> and can be reviewed through <strong>Certificates</strong>.</p>
+        <p>If the broker requires a client certificate, enable <strong>Send TLS client certificate</strong>. The tool then uses its own identity from <code>pki/own</code>. If it is missing, the library creates it automatically.</p>
+        <div class="success">After trusting a certificate, start the connection again. The first attempt remains rejected for safety.</div>
+      </section>
+
+      <section id="last-will">
+        <h2>Last Will / Testament</h2>
+        <p>The MQTT Last Will Testament is a message that the client registers with the broker during CONNECT. The broker publishes this message later only when the client disappears unexpectedly, for example because the process was killed, the network failed or power was lost. A normal click on <strong>Disconnect</strong> intentionally does not publish the testament.</p>
+        <p>On the <strong>Connection</strong> tab, enable <strong>Enable testament</strong>. Use <strong>Settings</strong> to open the detail fields for topic, payload, QoS, retain and MQTT 5 will options.</p>
+        <table class="table">
+          <tr><th>Field</th><th>Meaning</th><th>Typical use</th></tr>
+          <tr><td><strong>Last Will Topic</strong></td><td>Topic on which the broker publishes the testament.</td><td><code>plccom/tool/client/status</code> or a device status topic.</td></tr>
+          <tr><td><strong>Last Will Payload</strong></td><td>Payload of the testament message.</td><td><code>offline</code>, <code>disconnected unexpectedly</code> or a small JSON status object.</td></tr>
+          <tr><td><strong>Last Will QoS</strong></td><td>Delivery quality for the testament message.</td><td>QoS 1 is a good default for status messages.</td></tr>
+          <tr><td><strong>Retain</strong></td><td>The broker stores the testament as latest known state.</td><td>Very useful for online/offline state so new subscribers immediately see the state.</td></tr>
+          <tr><td><strong>Will Delay</strong></td><td>MQTT 5 wait time in seconds before the broker publishes the testament.</td><td>Useful for short network interruptions that recover quickly.</td></tr>
+          <tr><td><strong>Will Expiry</strong></td><td>MQTT 5 expiry time for the testament message.</td><td>For status values that should no longer be shown after a certain time.</td></tr>
+          <tr><td><strong>Content Type</strong></td><td>MQTT 5 hint for the testament payload format.</td><td><code>text/plain</code> or <code>application/json</code>.</td></tr>
+        </table>
+        <div class="note">Practical test: subscribe a second client to the Last Will topic, enable the testament, connect and then terminate the client process hard. The second client should receive the testament message.</div>
+      </section>
+
+      <section id="publish-basic">
+        <h2>Publish basics</h2>
+        <p>The <strong>Publish</strong> tab sends a payload to exactly one topic. A Topic Name is the address of the message, for example <code>plccom/test/temperature</code>. Wildcards such as <code>#</code> and <code>+</code> are not allowed when publishing.</p>
+        <div class="grid">
+          <div class="card"><strong>QoS 0</strong>Send once without acknowledgement. Fast, but not guaranteed.</div>
+          <div class="card"><strong>QoS 1</strong>At least once. The broker acknowledges; duplicates are possible.</div>
+          <div class="card"><strong>QoS 2</strong>Exactly once. Safest exchange, but more protocol steps.</div>
+          <div class="card"><strong>Retain</strong>The broker stores the last value for this topic and replays it immediately to new subscribers.</div>
+        </div>
+        <p>For simple tests, <strong>Topic Name</strong>, <strong>Payload</strong>, <strong>QoS</strong> and optionally <strong>Retain</strong> are enough. The right side contains optional MQTT 5 metadata.</p>
+      </section>
+
+      <section id="publish-mqtt5">
+        <h2>Publish MQTT 5 fields</h2>
+        <p>The fields on the right side of the Publish tab are optional. Leave them empty for a normal message. They become useful when you test MQTT 5 metadata, request/response patterns or extra message information.</p>
+        <table class="table">
+          <tr><th>Field</th><th>What does it mean?</th><th>When to use it?</th><th>Example</th></tr>
+          <tr><td><strong>Content Type</strong></td><td>Describes the payload format. It is a hint for the receiver, similar to HTTP.</td><td>Use it when receivers should know whether the payload is text, JSON, XML or another format. Brokers usually forward it without interpreting it.</td><td><code>text/plain</code>, <code>application/json</code>. Important: this is not a topic. A value such as <code>bad/#topic</code> is semantically wrong, even if it would only be transported as text.</td></tr>
+          <tr><td><strong>Message Expiry (s, 0=off)</strong></td><td>Lifetime of the message in seconds. After expiry, the broker should no longer deliver it.</td><td>Useful for measurements, status values or commands that are worthless after a short time. With <code>0</code>, the tool sends no expiry value.</td><td><code>30</code> for a value that is valid for 30 seconds. <code>0</code> for normal tests.</td></tr>
+          <tr><td><strong>MQTT 5 Response Topic</strong></td><td>Topic where a receiver should publish its answer. MQTT request/response is a convention, not a separate packet type.</td><td>Use it when you publish a request and expect a response. The receiver must read this field and publish the answer to that topic.</td><td><code>reply/plccom-client-1</code>. Leave empty for normal publish tests. Wildcards are not useful here.</td></tr>
+          <tr><td><strong>MQTT 5 Correlation Data</strong></td><td>An opaque correlation value. The receiver should copy it into the response.</td><td>Use it together with Response Topic so parallel requests can be matched to the correct answer.</td><td><code>request-4711</code>. Leave empty when not testing request/response.</td></tr>
+          <tr><td><strong>Name</strong> and <strong>Value</strong></td><td>One MQTT 5 User Property as a key/value pair. This is extra metadata on the message.</td><td>Use it for harmless additional information such as source, unit, tenant or test case. Do not use it for passwords or secrets.</td><td>Name <code>unit</code>, value <code>degC</code>; name <code>source</code>, value <code>client-tool</code>. It is sent only when both fields are filled.</td></tr>
+        </table>
+        <div class="note">Rule of thumb: Topic and Payload carry the actual message. The MQTT 5 fields on the right only describe the message further or help with request/response.</div>
+      </section>
+
+      <section id="subscribe-basic">
+        <h2>Subscribe basics</h2>
+        <p>The <strong>Subscribe</strong> tab subscribes to Topic Filters. A Topic Filter may contain wildcards. <code>plccom/test/#</code> receives all messages below <code>plccom/test/</code>.</p>
+        <table class="table">
+          <tr><th>Field</th><th>Meaning</th><th>Typical setting</th></tr>
+          <tr><td><strong>Topic Filter</strong></td><td>Which topics the client wants to receive. <code>#</code> and <code>+</code> are allowed here.</td><td><code>plccom/test/#</code> for many tests, or a concrete topic for a focused test.</td></tr>
+          <tr><td><strong>Max. QoS</strong></td><td>The highest QoS level with which this client wants to receive messages for this subscription.</td><td>Usually QoS 1. Use QoS 2 only when you explicitly test that flow.</td></tr>
+          <tr><td><strong>Receive Timeout</strong></td><td>Wait time for <strong>Receive once</strong>. The tool gives up if no matching message arrives in time.</td><td>1000 to 10000 ms, depending on your test environment.</td></tr>
+        </table>
+      </section>
+
+      <section id="subscribe-mqtt5">
+        <h2>Subscribe MQTT 5 options</h2>
+        <p>These options change how the broker delivers matching messages to this client. For first simple tests, keep them disabled.</p>
+        <table class="table">
+          <tr><th>Option</th><th>What does it mean?</th><th>When to use it?</th><th>Expected behavior</th></tr>
+          <tr><td><strong>Shared Subscription</strong></td><td>Multiple clients with the same Share Name share one subscription. The broker distributes matching messages across the group.</td><td>Use it when several workers should process the same task stream, but each message should be handled by only one worker.</td><td>Enable it and set a Share Name, for example <code>tool-workers</code>. The tool builds the shared subscription format internally. One client may look unchanged; two clients show the distribution.</td></tr>
+          <tr><td><strong>No Local</strong></td><td>The client does not receive its own published messages through this subscription.</td><td>Use it when publish and subscribe run in the same client and echo messages are unwanted.</td><td>Publish to a subscribed topic. With No Local, that own message should not appear in this client. This option is MQTT 5.</td></tr>
+          <tr><td><strong>Retain As Published</strong></td><td>The broker should preserve the Retain flag as it was set by the publisher.</td><td>Use it when the receiver needs to know whether the publisher marked the message as retained.</td><td>The displayed <code>Retain=true/false</code> stays closer to the original publish. Without this option, the broker may adjust the flag depending on the delivery situation.</td></tr>
+          <tr><td><strong>Retain Handling</strong></td><td>Controls whether retained messages are replayed immediately when subscribing.</td><td>Use it when you want to control whether a client immediately receives the last known state at startup.</td><td><code>Send retained now</code>: replay immediately. <code>Only if new</code>: only if this subscription is new. <code>Do not send retained</code>: do not replay retained messages during subscribe.</td></tr>
+          <tr><td><strong>Subscription Identifier</strong></td><td>An MQTT 5 number that the broker can attach to matching incoming messages.</td><td>Use it when one client has many subscriptions and a shared callback needs to know which subscription matched.</td><td>Enable it and set a number, for example <code>1</code>. Incoming messages can show this number in their message details if the broker supports it.</td></tr>
+        </table>
+        <div class="warning">Some brokers do not support every MQTT 5 option. If a broker rejects an option, the log shows the corresponding error or reason code.</div>
+      </section>
+
+      <section id="request">
+        <h2>Request / Response</h2>
+        <p>The <strong>Request</strong> tab tests the MQTT 5 request/response pattern. MQTT itself has no built-in question/answer; MQTT 5 enables it through two message properties: <strong>Response Topic</strong> and <strong>Correlation Data</strong>. You are the requester: you send a request and receive a correlated reply.</p>
+        <p>A responder (a device or service) subscribes to the request topic, processes the request and publishes the answer to the response topic with the same correlation token. This tool sends the request, waits for the correlated reply and shows it.</p>
+        <table class="table">
+          <tr><th>Field</th><th>Meaning</th><th>Example</th></tr>
+          <tr><td><strong>Request Topic</strong></td><td>Topic on which the request is published. The responder must listen here.</td><td><code>request/plccom</code></td></tr>
+          <tr><td><strong>Response Topic</strong></td><td>Topic on which the responder should publish the answer. The tool waits here for the reply.</td><td><code>response/plccom/client</code></td></tr>
+          <tr><td><strong>Payload</strong></td><td>The request content, for example a command or the name of a value to read.</td><td><code>read</code></td></tr>
+        </table>
+        <p>Click <strong>Send request</strong> (only when connected). The tool sends the request with random Correlation Data and waits up to 5 seconds for the matching reply. The reply is written to the log and added to the <strong>Messages</strong> tab.</p>
+        <div class="note">Typical use: read a value on demand ("read register X") or send a command and wait for a result/acknowledgement &mdash; a lightweight question/answer (RPC) over MQTT without a second protocol.</div>
+      </section>
+
+      <section id="messages">
+        <h2>Messages, log and diagnostics</h2>
+        <p>Received messages appear in the <strong>Messages</strong> tab and in the log. The log also shows connection state, failures, certificate events and diagnostics.</p><p>The <strong>Diagnostic level</strong> on the connection page controls how much internal detail is shown: <strong>Debug</strong> for detailed troubleshooting, <strong>Info</strong> as the normal default, <strong>Warnings/Errors/Fatal</strong> for reduced output and <strong>Off</strong> to suppress diagnostic events.</p>
+        <p>The log buttons copy, save or clear the output. For support, copy the relevant log lines including the root cause.</p>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>Troubleshooting</h2>
+        <table class="table">
+          <tr><th>Symptom</th><th>Likely cause</th><th>Next step</th></tr>
+          <tr><td>Connection refused</td><td>Broker is not running or the port is wrong.</td><td>Start the broker and check endpoint and port.</td></tr>
+          <tr><td>UnknownHostException</td><td>The host name cannot be resolved.</td><td>Check DNS, spelling or use an IP address.</td></tr>
+          <tr><td>Certificate not trusted</td><td>The broker certificate is not in the trusted store.</td><td>Open <strong>Certificates</strong> and review the certificate.</td></tr>
+          <tr><td>BAD_MQTT5_NOT_AUTHORIZED</td><td>The broker denies publish or subscribe.</td><td>Check credentials, access validator and topic.</td></tr>
+          <tr><td>Topic contains wildcards</td><td>Wildcards are not allowed for publish.</td><td>Use a concrete topic name for sending.</td></tr>
+        </table>
+      </section>
+    </div>
+  </main>
+  <footer class="footer">PLCcom MQTT Client Tool 2.1.1 - local offline help shipped with the application.</footer>
+</body>
+</html>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Aggregator (reactor) POM.
+
+    Its ONLY job is to build the modules below in the correct order with a single
+    command: the shared PLCcom.Console is built first, then the workshops and the
+    reference applications that depend on it.
+
+    It does NOT define versions or dependencies. Every module is self-contained:
+    the PLCcom MQTT SDK version lives in each module's own pom.xml, at its
+    dependency. You can still build, import and run any module on its own.
+
+        mvn clean install        (run in this folder - builds everything in order)
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.indi-an.plccom.examples</groupId>
+    <artifactId>plccom-mqtt-examples</artifactId>
+    <version>1.0.0</version>
+    <packaging>pom</packaging>
+
+    <name>PLCcom MQTT Examples</name>
+    <description>Reactor that builds the PLCcom MQTT workshops and reference applications.</description>
+
+    <modules>
+        <module>PLCcom.Console</module>
+        <module>Workshops/Client</module>
+        <module>Workshops/Broker</module>
+        <module>Reference_Applications/Client</module>
+        <module>Reference_Applications/Broker</module>
+    </modules>
+</project>

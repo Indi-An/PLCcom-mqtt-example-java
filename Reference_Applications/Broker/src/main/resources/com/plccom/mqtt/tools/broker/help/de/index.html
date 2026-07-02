@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PLCcom MQTT Broker Tool Hilfe</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="brand"><span class="logo-mark">PLCcom</span><span>MQTT Broker Tool</span></div>
+    <h1>Broker Tool Hilfe</h1>
+    <p class="lead">Diese lokale Hilfe erklaert die Standalone-Brokeroberflaeche: Listener, TLS, Client-Zertifikate, Access-Validator, Admin-Snapshot und Diagnose.</p>
+  </header>
+  <main class="shell">
+    <nav class="nav">
+      <strong>Inhalt</strong>
+      <a href="#purpose">Zweck</a>
+      <a href="#listeners">Listener</a>
+      <a href="#security">TLS und PKI</a>
+      <a href="#access">Access Validator</a>
+      <a href="#statistics">Admin/Statistik</a>
+      <a href="#log">Log und Diagnose</a>
+      <a href="#troubleshooting">Fehlerbilder</a>
+    </nav>
+    <div class="content">
+      <section id="purpose">
+        <h2>Wofuer ist dieses Tool gedacht?</h2>
+        <p>Das Broker Tool ist eine grafische Referenzanwendung fuer den PLCcom MQTT Broker. Es hilft beim manuellen Testen von TCP, TLS, WebSocket, WSS, Zertifikatsvertrauen, Zugriffskontrolle und Admin-Daten.</p>
+        <div class="note">Das Tool ist bewusst auf die sichtbare Broker-Referenzoberflaeche reduziert. Embedded Publishing und lokale Java-Listener werden in den nummerierten Workshops gezeigt.</div>
+      </section>
+
+      <section id="listeners">
+        <h2>Listener verwalten</h2>
+        <p>Ein Listener ist ein Netzwerk-Einstiegspunkt des Brokers. Die Tabelle kann beliebig viele TCP-, TLS-, WebSocket- und WSS-Listener enthalten. Jeder Eintrag hat Name, Transport, Bind-Adresse, Port, den daraus gebildeten Endpoint und die Zertifikatsauswahl fuer TLS/WSS.</p>
+        <table class="table">
+          <tr><th>Transport</th><th>Bedeutung</th><th>Typischer Port</th></tr>
+          <tr><td>TCP</td><td>MQTT ueber TCP ohne TLS.</td><td>1883</td></tr>
+          <tr><td>TLS</td><td>MQTT ueber TLS mit Broker-Zertifikat.</td><td>8883</td></tr>
+          <tr><td>WS</td><td>MQTT ueber WebSocket ohne TLS.</td><td>8080</td></tr>
+          <tr><td>WSS</td><td>MQTT ueber sicheren WebSocket.</td><td>8443</td></tr>
+        </table>
+        <div class="success">Neue Listener erhalten automatisch einen eindeutigen Namen. Wenn ein Listener geloescht wird, sucht das Tool beim naechsten Hinzufuegen die naechste freie Nummer.</div>
+        <p><strong>Bind-Adresse:</strong> <code>127.0.0.1</code> beschraenkt den Broker auf den lokalen Rechner. <code>0.0.0.0</code> lauscht auf allen IPv4-Netzwerkadressen und sollte nur bewusst verwendet werden.</p><p><strong>Endpoint:</strong> Diese Spalte zeigt die Adresse, die ein Client verwenden kann, zum Beispiel <code>mqtt://127.0.0.1:1883</code>, <code>mqtts://127.0.0.1:8883</code>, <code>ws://127.0.0.1:8080/mqtt</code> oder <code>wss://127.0.0.1:8443/mqtt</code>.</p><p><strong>Zertifikat:</strong> TCP und WS benoetigen kein Serverzertifikat. TLS und WSS verwenden entweder <em>Standard</em> oder ein bestimmtes eigenes Zertifikat aus dem Broker-PKI-Store unter <code>pki/own</code>. So kann ein bestimmter Port ein eigenes Zertifikat bekommen, waehrend alle anderen TLS/WSS-Ports weiterhin das Standardzertifikat nutzen. Client-Zertifikatsmodus, PKI-Vertrauen, TLS-Protokolle und Timeouts bleiben dabei aus der Standard-TLS-Konfiguration erhalten.</p>
+      </section>
+
+      <section id="security">
+        <h2>TLS, WSS und Zertifikate</h2>
+        <p>TLS und WSS verwenden die eigene Broker-Tool-Identitaet aus dem festen Broker-PKI-Store unter <code>PLCcom/Mqtt/Broker/pki</code>. Fehlt die Identitaet, erzeugt die Library sie automatisch. Wenn in der Listener-Tabelle fuer einen TLS/WSS-Port ein anderer Alias gewaehlt wird, verwendet nur dieser Port dieses Zertifikat; alle anderen sicheren Listener bleiben beim Standard. Die Sicherheitsregeln fuer Client-Zertifikate und PKI-Vertrauen werden dadurch nicht abgeschaltet.</p>
+        <p>Der Button <strong>Zertifikate</strong> oeffnet die lokale Zertifikatsverwaltung. Dort sehen Sie eigenes Zertifikat, trusted Zertifikate, rejected Zertifikate und Issuer.</p>
+        <h3>Client-Zertifikate</h3>
+        <p>Im Feld <strong>Client-Zertifikate</strong> legen Sie fest, ob der Broker keine, optionale oder verpflichtende Client-Zertifikate erwartet. Unbekannte Client-Zertifikate werden im Broker-PKI-Store unter <code>rejected/certs</code> abgelegt und koennen anschliessend vertraut werden.</p>
+        <p>Wichtig: Der PKI-Store beantwortet nur die technische Frage, ob ein Zertifikat vertraut ist. Die fachliche Anmeldung eines Benutzers geschieht danach im Access Validator, der Subject, Issuer, Seriennummer und Fingerprint auswerten kann.</p>
+        <div class="warning">Wenn Client-Zertifikate verpflichtend sind und der Client keines sendet, bricht der TLS-Handshake ab. Das ist korrektes Verhalten.</div>
+      </section>
+
+      <section id="access">
+        <h2>Access Validator</h2>
+        <p>Der Demo-Validator ist ein Testwerkzeug fuer die Oberflaeche. Ohne aktivierten Demo-Validator ist der Broker offen. Mit Demo-Validator koennen Sie Benutzername verlangen, ein vertrauenswuerdiges Benutzerzertifikat verlangen und Publish/Subscribe fuer einen Topic-Prefix blockieren.</p>
+        <div class="grid">
+          <div class="card"><strong>Benutzername verlangen</strong>CONNECT wird nur akzeptiert, wenn ein Benutzername mitgesendet wird.</div>
+          <div class="card"><strong>Benutzerzertifikat verlangen</strong>CONNECT wird nur akzeptiert, wenn der Client ueber TLS/WSS ein vertrautes Zertifikat sendet. Das Zertifikat ist dann die Benutzeridentitaet fuer diesen Test. Steht der TLS-Modus noch auf <code>NONE</code>, fordert das Tool beim Start trotzdem verpflichtend ein Client-Zertifikat an, damit die Regel technisch funktionieren kann.</div>
+          <div class="card"><strong>Blockierter Topic-Prefix</strong>Publish und Subscribe auf diesen Prefix werden abgelehnt.</div>
+        </div>
+        <p>Produktiv wuerde eine Anwendung einen eigenen Access Validator verwenden. Dort koennen Fingerprint, Subject, Issuer, Seriennummer oder eigene Zertifikatserweiterungen auf echte Benutzerkonten und Topic-Rechte gemappt werden. Der PKI-Store ersetzt diese Benutzer- und Rechteverwaltung nicht.</p>
+      </section>
+
+      <section id="statistics">
+        <h2>Admin und Statistik</h2>
+        <p>Der Reiter <strong>Admin/Statistik</strong> zeigt den aktuellen Brokerzustand: gebundene Ports, aktive Verbindungen, Sessions, Subscriptions, queued Messages, retained Messages und Zaehler fuer eingegangene Publishes.</p>
+        <p><strong>Statistik aktualisieren</strong> liest die Werte neu ein. <strong>Counter zuruecksetzen</strong> setzt Diagnosezaehler zurueck, damit ein neuer Testlauf klar erkennbar ist.</p>
+      </section>
+
+      <section id="log">
+        <h2>Log und Diagnose</h2>
+        <p>Das Log zeigt Start/Stop, belegte Ports, Zertifikatsereignisse, Access-Entscheidungen, Admin-Aktionen und interne Diagnosemeldungen. Bei Fehlern steht die technische Ursache in der Zeile <strong>Details</strong>.</p><p>Der <strong>Diagnose-Level</strong> legt fest, ab welcher Schwere Diagnoseereignisse im Tool landen. Abgelehnte CONNECT-Versuche durch den Access Validator, zum Beispiel bei falschem Benutzer oder Passwort, erscheinen als <strong>Warning</strong>. Passwortdaten werden nicht protokolliert.</p>
+        <p>Die Log-Buttons links kopieren, speichern oder leeren die Ausgabe. Fuer Supportfaelle ist der kopierte Log oft aussagekraeftiger als ein Screenshot.</p>
+      </section>
+
+      <section id="troubleshooting">
+        <h2>Typische Fehlerbilder</h2>
+        <table class="table">
+          <tr><th>Symptom</th><th>Wahrscheinliche Ursache</th><th>Naechster Schritt</th></tr>
+          <tr><td>Address already in use</td><td>Port wird bereits von Mosquitto oder einem anderen Broker verwendet.</td><td>Anderen Port verwenden oder fremden Dienst stoppen.</td></tr>
+          <tr><td>TLS startet nicht</td><td>Eigene Broker-Identitaet fehlt oder Passwort ist falsch.</td><td>Zertifikatsmanager pruefen, Identitaet erzeugen oder Passwort korrigieren.</td></tr>
+          <tr><td>bad_certificate</td><td>Client-Zertifikat fehlt oder ist nicht vertraut.</td><td>Client-Zertifikat senden und im Broker-Tool vertrauen.</td></tr>
+          <tr><td>Client darf nicht publishen</td><td>Demo-Validator blockiert das Topic.</td><td>Prefix pruefen oder Demo-Validator deaktivieren.</td></tr>
+          <tr><td>Keine Verbindung von anderem Rechner</td><td>Bind-Adresse ist <code>127.0.0.1</code> oder Firewall blockiert.</td><td><code>0.0.0.0</code> bewusst setzen und Firewall pruefen.</td></tr>
+        </table>
+      </section>
+    </div>
+  </main>
+  <footer class="footer">PLCcom MQTT Broker Tool 2.1.1 - lokale Hilfe, offline ausgeliefert mit der Anwendung.</footer>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Self-contained module. The PLCcom MQTT SDK version is set right here. -->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.indi-an.plccom.examples</groupId>
+    <artifactId>plccom-mqtt-tools-broker</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+
+    <name>PLCcom MQTT Broker Tool</name>
+    <description>Standalone Swing reference application for the high-level and embedded PLCcom MQTT broker API.</description>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <maven.compiler.release>11</maven.compiler.release>
+    </properties>
+
+    <dependencies>
+        <!-- PLCcom MQTT SDK - change this version to target another SDK release. -->
+        <dependency>
+            <groupId>com.indi-an.plccom</groupId>
+            <artifactId>plccom-mqtt-broker</artifactId>
+            <version>2.1.1</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.4.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>com.plccom.mqtt.tools.broker.PlccomMqttBrokerToolApp</mainClass>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.0</version>
+                <configuration>
+                    <mainClass>com.plccom.mqtt.tools.broker.PlccomMqttBrokerToolApp</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

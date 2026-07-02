@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img"
+     font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <title>PLCcom MQTT Java Examples overview</title>
+  <desc>A PLCcom MQTT client and broker exchange messages through an MQTT broker over the mqtt, ws, mqtts and wss transports. The repository provides twelve client workshops, ten broker workshops and two reference applications.</desc>
+
+  <defs>
+    <marker id="arwR" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#2563eb"/>
+    </marker>
+    <marker id="arwL" markerWidth="9" markerHeight="9" refX="0" refY="3" orient="auto">
+      <path d="M6,0 L0,3 L6,6 Z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <!-- Card background (keeps text readable on light and dark themes) -->
+  <rect x="0" y="0" width="960" height="520" rx="16" fill="#f8fafc"/>
+
+  <!-- Header -->
+  <text x="40" y="50" font-size="26" font-weight="700" fill="#0b1f44">PLCcom MQTT — Java Examples</text>
+  <text x="40" y="74" font-size="14" fill="#64748b">High-level Client &amp; Broker · workshops + reference applications · MIT-licensed</text>
+  <line x1="40" y1="90" x2="920" y2="90" stroke="#e2e8f0" stroke-width="1.5"/>
+
+  <!-- ===== Client Workshops panel ===== -->
+  <rect x="40" y="112" width="270" height="286" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="58" y="140" font-size="15" font-weight="700" fill="#0b1f44">Client Workshops</text>
+
+  <g>
+    <rect x="58" y="158" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="70" y="172" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="84" y="188" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">1x</text>
+    <text x="108" y="182" font-size="13" font-weight="700" fill="#0b1f44">Getting Started</text>
+    <text x="108" y="198" font-size="11" fill="#64748b">connect · QoS · retained · will</text>
+
+    <rect x="58" y="216" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="70" y="230" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="84" y="246" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">2x</text>
+    <text x="108" y="240" font-size="13" font-weight="700" fill="#0b1f44">MQTT 5</text>
+    <text x="108" y="256" font-size="11" fill="#64748b">properties · request/response · JSON</text>
+
+    <rect x="58" y="274" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="70" y="288" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="84" y="304" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">3x</text>
+    <text x="108" y="298" font-size="13" font-weight="700" fill="#0b1f44">Resilience</text>
+    <text x="108" y="314" font-size="11" fill="#64748b">sessions · reconnect · shared subs</text>
+
+    <rect x="58" y="332" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="70" y="346" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="84" y="362" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">4x</text>
+    <text x="108" y="356" font-size="13" font-weight="700" fill="#0b1f44">Security</text>
+    <text x="108" y="372" font-size="11" fill="#64748b">TLS · mTLS · diagnostics</text>
+  </g>
+
+  <!-- ===== Broker (center) ===== -->
+  <rect x="372" y="210" width="216" height="92" rx="14" fill="#0b1f44"/>
+  <text x="480" y="250" font-size="18" font-weight="700" fill="#ffffff" text-anchor="middle">MQTT Broker</text>
+  <text x="480" y="272" font-size="12" fill="#a9b6cf" text-anchor="middle">MQTT 3.1.1 / 5.0</text>
+
+  <!-- transports -->
+  <g font-size="12" font-weight="600" fill="#334155" text-anchor="middle">
+    <rect x="373" y="316" width="54" height="24" rx="12" fill="#eef2ff"/><text x="400" y="332">mqtt</text>
+    <rect x="431" y="316" width="42" height="24" rx="12" fill="#eef2ff"/><text x="452" y="332">ws</text>
+    <rect x="477" y="316" width="60" height="24" rx="12" fill="#e2ecff"/><text x="507" y="332">mqtts</text>
+    <rect x="541" y="316" width="46" height="24" rx="12" fill="#e2ecff"/><text x="564" y="332">wss</text>
+  </g>
+  <line x1="480" y1="302" x2="480" y2="316" stroke="#cbd5e1" stroke-width="1.5"/>
+
+  <!-- client <-> broker connector -->
+  <line x1="311" y1="256" x2="371" y2="256" stroke="#2563eb" stroke-width="2"
+        marker-start="url(#arwL)" marker-end="url(#arwR)"/>
+  <rect x="321" y="246" width="40" height="20" rx="10" fill="#2563eb"/>
+  <text x="341" y="260" font-size="10" font-weight="700" fill="#ffffff" text-anchor="middle">MQTT</text>
+
+  <!-- broker <-> broker-workshops connector -->
+  <line x1="589" y1="256" x2="649" y2="256" stroke="#94a3b8" stroke-width="1.6" stroke-dasharray="4 3"/>
+  <rect x="597" y="246" width="44" height="20" rx="10" fill="#eef2ff" stroke="#cbd5e1"/>
+  <text x="619" y="260" font-size="10" font-weight="600" fill="#475569" text-anchor="middle">hosts</text>
+
+  <!-- ===== Broker Workshops panel ===== -->
+  <rect x="650" y="112" width="270" height="286" rx="12" fill="#ffffff" stroke="#e2e8f0"/>
+  <text x="668" y="140" font-size="15" font-weight="700" fill="#0b1f44">Broker Workshops</text>
+
+  <g>
+    <rect x="668" y="158" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="680" y="172" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="694" y="188" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">1x</text>
+    <text x="718" y="182" font-size="13" font-weight="700" fill="#0b1f44">Basics</text>
+    <text x="718" y="198" font-size="11" fill="#64748b">broker · listeners · TLS/WSS</text>
+
+    <rect x="668" y="216" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="680" y="230" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="694" y="246" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">2x</text>
+    <text x="718" y="240" font-size="13" font-weight="700" fill="#0b1f44">Embedded</text>
+    <text x="718" y="256" font-size="11" fill="#64748b">in-process publish / listen</text>
+
+    <rect x="668" y="274" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="680" y="288" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="694" y="304" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">3x</text>
+    <text x="718" y="298" font-size="13" font-weight="700" fill="#0b1f44">Security</text>
+    <text x="718" y="314" font-size="11" fill="#64748b">access · auth · PKI</text>
+
+    <rect x="668" y="332" width="234" height="50" rx="8" fill="#f1f5f9"/>
+    <rect x="680" y="346" width="28" height="22" rx="6" fill="#2563eb"/>
+    <text x="694" y="362" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">4x</text>
+    <text x="718" y="356" font-size="13" font-weight="700" fill="#0b1f44">Service</text>
+    <text x="718" y="372" font-size="11" fill="#64748b">stores · admin · diagnostics</text>
+  </g>
+
+  <!-- ===== Footer band ===== -->
+  <rect x="40" y="418" width="880" height="72" rx="12" fill="#0b1f44"/>
+  <text x="64" y="448" font-size="14" font-weight="700" fill="#ffffff">Reference Applications</text>
+  <text x="64" y="470" font-size="12" fill="#a9b6cf">Client Tool · Broker Tool — full Swing apps (DE / EN, integrated help)</text>
+  <line x1="600" y1="436" x2="600" y2="472" stroke="#24365e" stroke-width="1.5"/>
+  <text x="628" y="448" font-size="14" font-weight="700" fill="#ffffff">Shared</text>
+  <text x="628" y="470" font-size="12" fill="#a9b6cf">PLCcom.Console — readable workshop output</text>
+</svg>
