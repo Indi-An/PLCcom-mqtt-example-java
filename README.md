@@ -108,7 +108,7 @@ The examples use the PLCcom MQTT Java packages:
 
 **Each module is self-contained.** Open any module's own `pom.xml` and the SDK version is written right there, at the dependency — there is no hidden parent that controls it. To target another PLCcom MQTT release, change the `<version>` in the module you build (the workshop or reference-application module you are using).
 
-The root `pom.xml` is only a reactor — it lists the modules and builds them in the right order (the shared `PLCcom.Console` first). It never overrides the SDK version, which stays visible in each module's own `pom.xml`. In your IDE you import the **module** folders, not the root: with an Eclipse workspace at the repository root, m2e skips the root aggregator (the harmless "existing workspace folder" note) and imports each module as its own project — exactly as in the PLCcom OPC UA and Modbus example repositories.
+The root `pom.xml` is only a reactor — it lists the modules and builds them in the right order (the shared `PLCcom.Console` first). It never overrides the SDK version, which stays visible in each module's own `pom.xml`. In your IDE you import the **module** folders, not the root: with an Eclipse workspace at the repository root, m2e skips the root aggregator (the harmless "existing workspace folder" note) and imports each module as its own project — exactly as in the sibling PLCcom OPC UA example repository.
 
 ## 🧰 Requirements
 
@@ -129,14 +129,19 @@ cd PLCcom-mqtt-example-java
 
 ### 2. Add your license credentials
 
-Every workshop shows exactly where to put your license — a visible block near the top of each class:
+You need a PLCcom MQTT license (a user name and a serial number). Two ways to get one:
+
+- **Free trial** — generate a time-limited trial license on the [PLCcom MQTT download page](https://www.indi-an.com/en/plccom/mqtt/mqtt-download/).
+- **Purchase** — buy a full license on the [PLCcom MQTT buy page](https://www.indi-an.com/en/plccom/mqtt/mqtt-buy/).
+
+Every workshop shows exactly where to put your credentials — a visible block near the top of each class:
 
 ~~~java
 private static final String LICENSE_USER   = "<Enter your UserName here>";
 private static final String LICENSE_SERIAL = "<Enter your Serial here>";
 ~~~
 
-Replace both values with the credentials from your license e-mail. A client-only license is enough for the client workshops; broker workshops need a broker (or broker+client) license.
+Replace both values with the credentials from your license (trial or purchased). A client-only license is enough for the client workshops; broker workshops need a broker (or broker+client) license.
 
 ### 3. Build
 
