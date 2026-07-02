@@ -18,11 +18,11 @@ A complete Swing desktop application for the **PLCcom MQTT broker**. It starts a
 mvn -f Reference_Applications/Broker/pom.xml exec:java
 ~~~
 
-Or build a runnable jar:
+Or build a runnable jar and start the GUI without a console window with `javaw` (Windows; on Linux/macOS use `java`):
 
 ~~~powershell
 mvn -f Reference_Applications/Broker/pom.xml package
-java -jar Reference_Applications/Broker/target/plccom-mqtt-tools-broker-1.0.0.jar
+javaw -jar Reference_Applications/Broker/target/plccom-mqtt-tools-broker-1.0.0.jar
 ~~~
 
 Enter your PLCcom MQTT license in the application when prompted. This is a reference/testing application — see the [Safety Notice](../../README.md#-safety-notice) before using it against real equipment.

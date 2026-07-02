@@ -18,11 +18,11 @@ A complete Swing desktop application for the **high-level PLCcom MQTT client**. 
 mvn -f Reference_Applications/Client/pom.xml exec:java
 ~~~
 
-Or build a runnable jar:
+Or build a runnable jar and start the GUI without a console window with `javaw` (Windows; on Linux/macOS use `java`):
 
 ~~~powershell
 mvn -f Reference_Applications/Client/pom.xml package
-java -jar Reference_Applications/Client/target/plccom-mqtt-tools-client-1.0.0.jar
+javaw -jar Reference_Applications/Client/target/plccom-mqtt-tools-client-1.0.0.jar
 ~~~
 
 Enter your PLCcom MQTT license in the application when prompted. This is a reference/testing application — see the [Safety Notice](../../README.md#-safety-notice) before using it against real equipment.
