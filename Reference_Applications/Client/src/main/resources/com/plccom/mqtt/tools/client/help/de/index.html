@@ -57,9 +57,10 @@
 
       <section id="security">
         <h2>TLS und Zertifikate</h2>
-        <p>Bei <code>mqtts://</code> und <code>wss://</code> prueft das Tool das Broker-Zertifikat im festen Client-PKI-Store unter <code>PLCcom/Mqtt/Client/pki</code>. Unbekannte Zertifikate landen in <code>rejected/certs</code> und koennen ueber den Button <strong>Zertifikate</strong> geprueft und vertraut werden.</p>
-        <p>Wenn der Broker ein Client-Zertifikat verlangt, aktivieren Sie <strong>TLS-Client-Zertifikat senden</strong>. Das Tool verwendet dann die eigene Client-Identitaet aus <code>pki/own</code>. Fehlt sie, erzeugt die Library sie automatisch.</p>
-        <div class="success">Nach dem Vertrauen eines Zertifikats muss die Verbindung erneut gestartet werden. Der erste Versuch bleibt aus Sicherheitsgruenden abgelehnt.</div>
+        <p>Bei <code>mqtts://</code> und <code>wss://</code> prueft das Tool das Broker-Zertifikat im festen Client-PKI-Store unter <code>PLCcom/Mqtt/Client/pki</code>. Unbekannte Zertifikate landen in <code>rejected/certs</code> und koennen ueber den Button <strong>Zertifikate</strong> geprueft und vertraut werden. Trust ist aber nicht die einzige Pruefung: Das Broker-Zertifikat muss auch zum Host im Endpoint passen, zum Beispiel <code>my_broker_host</code> in <code>mqtts://my_broker_host:8883</code>. Wenn ein trusted Zertifikat nur <code>localhost</code> im SAN/CN enthaelt, bleibt die Verbindung fuer diesen Host abgelehnt.</p>
+        <div class="note">Hostnamen mit Unterstrich (Windows-/NetBIOS-Rechnernamen wie <code>my_broker_host</code>) werden fuer <code>mqtts://</code> und <code>wss://</code> unterstuetzt. Die Standard-Java-Hostpruefung lehnt solche Namen ab; das Tool prueft den Zertifikats-Host daher selbst. Das Broker-Zertifikat muss diesen Host trotzdem im SAN enthalten.</div>
+        <p>Wenn der Broker ein Client-Zertifikat verlangt, aktivieren Sie <strong>TLS-Client-Zertifikat senden</strong>. Das Tool verwendet dann die eigene Client-Identitaet aus <code>pki/own</code>. Fehlt sie, erzeugt die Library sie automatisch. Dieses Client-Zertifikat dient als Client-Identitaet fuer mTLS und Access-Validierung; es muss nicht zum Broker-Hostnamen passen.</p>
+        <div class="success">Nach dem Vertrauen eines Zertifikats muss die Verbindung erneut gestartet werden. Der erste Versuch bleibt aus Sicherheitsgruenden abgelehnt. Wenn der naechste Versuch trotzdem mit Hostname-Mismatch scheitert, benoetigen Sie ein Broker-Zertifikat, dessen SAN/CN den Endpoint-Host enthaelt.</div>
       </section>
 
       <section id="last-will">
@@ -146,7 +147,10 @@
 
       <section id="messages">
         <h2>Nachrichten, Log und Diagnose</h2>
-        <p>Empfangene Nachrichten erscheinen im Reiter <strong>Nachrichten</strong> und im Log. Das Log zeigt ausserdem Verbindungsstatus, Fehler, Zertifikatsereignisse und Diagnosemeldungen.</p><p>Der <strong>Diagnose-Level</strong> auf der Verbindungsseite steuert, wie ausfuehrlich interne Ereignisse angezeigt werden: <strong>Debug</strong> fuer detaillierte Fehlersuche, <strong>Info</strong> als normaler Standard, <strong>Warnings/Errors/Fatal</strong> fuer reduzierte Ausgaben und <strong>Off</strong> zum Abschalten der Diagnoseereignisse.</p>
+        <p>Empfangene Nachrichten erscheinen im Reiter <strong>Nachrichten</strong> und im Log. Das Log zeigt ausserdem Verbindungsstatus, Fehler, Zertifikatsereignisse und Diagnosemeldungen.</p>
+        <p>Der <strong>Diagnose-Level</strong> (unten links) steuert das gesamte Log &mdash; SDK-Diagnosemeldungen und die Meldungen des Tools: <strong>Debug</strong> fuer detaillierte Fehlersuche, <strong>Info</strong> als normaler Standard, <strong>Warnings/Errors</strong> reduzieren die Ausgabe auf Probleme, <strong>Fatal</strong> zeigt nur fatale SDK-Fehler und <strong>Off</strong> blendet alles aus. Eine Aenderung des Levels wirkt sofort auf eine bestehende Verbindung &mdash; ohne neu zu verbinden.</p>
+        <p><strong>Nachrichten-Payloads bei Debug.</strong> Auf der Stufe <strong>Debug</strong> erscheint zu jeder gesendeten und empfangenen Nachricht ein Diagnoseeintrag mit dem genauen Inhalt &mdash; als Text, oder als Hex bei Binaerdaten, auf eine Zeile gekuerzt. Das hilft bei der Analyse; beachten Sie aber, dass Payloads sensible Daten enthalten koennen &mdash; lassen Sie <strong>Debug</strong> daher nur bei Bedarf eingeschaltet.</p>
+        <p><strong>Grosses Log-Fenster.</strong> Das Fenster-Symbol in der Log-Leiste oeffnet das Log in einer separaten, groessenveraenderbaren Live-Ansicht. Der Schalter <strong>Auto-Scroll</strong> laesst Sie entweder den neuesten Zeilen folgen oder Ihre Position halten, waehrend Sie aeltere Ausgaben lesen. <strong>Max. Zeilen</strong> begrenzt das gespeicherte Log (die aeltesten Zeilen fallen weg), damit lange Analyse-Sitzungen fluessig bleiben.</p>
         <p>Die Log-Buttons links kopieren, speichern oder leeren die Ausgabe. Kopieren Sie bei Supportfaellen am besten den kompletten Log-Ausschnitt inklusive Ursache.</p>
       </section>
 
@@ -156,13 +160,13 @@
           <tr><th>Symptom</th><th>Wahrscheinliche Ursache</th><th>Naechster Schritt</th></tr>
           <tr><td>Connection refused</td><td>Broker laeuft nicht oder falscher Port.</td><td>Broker starten, Port und Endpoint pruefen.</td></tr>
           <tr><td>UnknownHostException</td><td>Hostname kann nicht aufgeloest werden.</td><td>DNS, Schreibweise oder IP-Adresse pruefen.</td></tr>
-          <tr><td>Zertifikat nicht trusted</td><td>Broker-Zertifikat ist noch nicht im trusted Store.</td><td>Button <strong>Zertifikate</strong> oeffnen und Zertifikat pruefen.</td></tr>
+          <tr><td>Zertifikat nicht trusted</td><td>Broker-Zertifikat ist noch nicht im trusted Store.</td><td>Button <strong>Zertifikate</strong> oeffnen und Zertifikat pruefen.</td></tr><tr><td>Zertifikat passt nicht zum Host</td><td>Das Zertifikat ist trusted, aber SAN/CN enthaelt nicht den Endpoint-Host.</td><td>Ein Broker-Zertifikat fuer diesen Host verwenden oder mit dem Hostnamen verbinden, der im Zertifikat enthalten ist.</td></tr>
           <tr><td>BAD_MQTT5_NOT_AUTHORIZED</td><td>Broker verweigert Publish/Subscribe.</td><td>Benutzer, Passwort, Access-Validator und Topic pruefen.</td></tr>
           <tr><td>Topic enthaelt Wildcards</td><td>Wildcards sind bei Publish nicht erlaubt.</td><td>Nur konkrete Topic Names zum Senden verwenden.</td></tr>
         </table>
       </section>
     </div>
   </main>
-  <footer class="footer">PLCcom MQTT Client Tool 2.1.1 - lokale Hilfe, offline ausgeliefert mit der Anwendung.</footer>
+  <footer class="footer">PLCcom MQTT Client Tool 2.x.x - lokale Hilfe, offline ausgeliefert mit der Anwendung.</footer>
 </body>
 </html>

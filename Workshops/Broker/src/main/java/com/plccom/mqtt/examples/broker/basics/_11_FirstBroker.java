@@ -67,9 +67,10 @@ public final class _11_FirstBroker {
     // =========================================================================
 
     // The bind address and port for the TCP listener. 127.0.0.1 keeps the broker
-    // local to this machine; port 0 lets the operating system choose a free port.
+    // local to this machine. 1883 is the standard MQTT-over-TCP port; if another
+    // MQTT broker on this machine already uses it, stop that one first.
     private static final String BIND_ADDRESS = "127.0.0.1";
-    private static final int    TCP_PORT     = 0;
+    private static final int    TCP_PORT     = 1883;
 
     private _11_FirstBroker() {
     }
@@ -127,7 +128,7 @@ public final class _11_FirstBroker {
 
         try {
             // -- Step 2: report the bound endpoint ----------------------------
-            // getBoundPort() returns the actual port (useful when TCP_PORT was 0).
+            // getBoundPort() returns the port the broker actually bound to.
             int port = broker.getBoundPort();
             System.out.println("  Broker is running.");
             System.out.println("  Listening on : mqtt://" + BIND_ADDRESS + ":" + port);

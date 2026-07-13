@@ -32,7 +32,7 @@
 
       <section id="listeners">
         <h2>Listener verwalten</h2>
-        <p>Ein Listener ist ein Netzwerk-Einstiegspunkt des Brokers. Die Tabelle kann beliebig viele TCP-, TLS-, WebSocket- und WSS-Listener enthalten. Jeder Eintrag hat Name, Transport, Bind-Adresse, Port, den daraus gebildeten Endpoint und die Zertifikatsauswahl fuer TLS/WSS.</p>
+        <p>Ein Listener ist ein Netzwerk-Einstiegspunkt des Brokers. Die Tabelle kann beliebig viele TCP-, TLS-, WebSocket- und WSS-Listener enthalten. Jeder Eintrag zeigt Name, Transport, Bind-Adresse, Port, den daraus gebildeten Endpoint sowie fuer TLS/WSS das Zertifikat und den Client-Zertifikatsmodus. Alle Eigenschaften werden im Listener-Editor bearbeitet (Doppelklick oder <strong>Bearbeiten</strong>).</p>
         <table class="table">
           <tr><th>Transport</th><th>Bedeutung</th><th>Typischer Port</th></tr>
           <tr><td>TCP</td><td>MQTT ueber TCP ohne TLS.</td><td>1883</td></tr>
@@ -41,29 +41,27 @@
           <tr><td>WSS</td><td>MQTT ueber sicheren WebSocket.</td><td>8443</td></tr>
         </table>
         <div class="success">Neue Listener erhalten automatisch einen eindeutigen Namen. Wenn ein Listener geloescht wird, sucht das Tool beim naechsten Hinzufuegen die naechste freie Nummer.</div>
-        <p><strong>Bind-Adresse:</strong> <code>127.0.0.1</code> beschraenkt den Broker auf den lokalen Rechner. <code>0.0.0.0</code> lauscht auf allen IPv4-Netzwerkadressen und sollte nur bewusst verwendet werden.</p><p><strong>Endpoint:</strong> Diese Spalte zeigt die Adresse, die ein Client verwenden kann, zum Beispiel <code>mqtt://127.0.0.1:1883</code>, <code>mqtts://127.0.0.1:8883</code>, <code>ws://127.0.0.1:8080/mqtt</code> oder <code>wss://127.0.0.1:8443/mqtt</code>.</p><p><strong>Zertifikat:</strong> TCP und WS benoetigen kein Serverzertifikat. TLS und WSS verwenden entweder <em>Standard</em> oder ein bestimmtes eigenes Zertifikat aus dem Broker-PKI-Store unter <code>pki/own</code>. So kann ein bestimmter Port ein eigenes Zertifikat bekommen, waehrend alle anderen TLS/WSS-Ports weiterhin das Standardzertifikat nutzen. Client-Zertifikatsmodus, PKI-Vertrauen, TLS-Protokolle und Timeouts bleiben dabei aus der Standard-TLS-Konfiguration erhalten.</p>
+        <p><strong>Bind-Adresse:</strong> <code>127.0.0.1</code> beschraenkt den Broker auf den lokalen Rechner. <code>0.0.0.0</code> lauscht auf allen IPv4-Netzwerkadressen und sollte nur bewusst verwendet werden.</p><p><strong>Endpoint:</strong> Diese Spalte zeigt die Adresse, die ein Client verwenden kann, zum Beispiel <code>mqtt://127.0.0.1:1883</code>, <code>mqtts://127.0.0.1:8883</code>, <code>ws://127.0.0.1:8080/mqtt</code> oder <code>wss://127.0.0.1:8443/mqtt</code>. Bei WS/WSS laesst sich der WebSocket-Pfad (Standard <code>/mqtt</code>) im Listener-Editor anpassen.</p><p><strong>Zertifikat und Zertifikatspasswort:</strong> TCP und WS benoetigen kein Serverzertifikat. Jeder TLS/WSS-Listener verwendet entweder <em>Standard</em> oder ein bestimmtes eigenes Zertifikat aus dem Broker-PKI-Store unter <code>pki/own</code> - inklusive eigenem Zertifikatspasswort. <em>Standard</em> bedeutet: Das vom Tool verwaltete Broker-Zertifikat wird automatisch erzeugt oder erneuert, damit seine Subject Alternative Names zu den Hosts der Standard-Listener passen. Ein konkreter Alias bedeutet: Genau dieses Zertifikat wird unveraendert fuer diesen Listener verwendet; das Tool schreibt keine SAN-Werte um und ersetzt es nicht, meldet aber eine Warnung, wenn es nicht zum Endpoint-Host passt. Das Passwort gehoert zur Listener-/Zertifikatszuweisung; es gibt kein gemeinsames Passwort fuer alle Zertifikate.</p><p><strong>Client-Zertifikate:</strong> Der Modus <code>NONE</code>/<code>OPTIONAL</code>/<code>REQUIRED</code> wird ebenfalls pro Listener gesetzt. Ein Broker kann also gleichzeitig einen TLS-Port mit <code>OPTIONAL</code> und einen zweiten mit <code>REQUIRED</code> betreiben.</p>
       </section>
 
       <section id="security">
         <h2>TLS, WSS und Zertifikate</h2>
-        <p>TLS und WSS verwenden die eigene Broker-Tool-Identitaet aus dem festen Broker-PKI-Store unter <code>PLCcom/Mqtt/Broker/pki</code>. Fehlt die Identitaet, erzeugt die Library sie automatisch. Wenn in der Listener-Tabelle fuer einen TLS/WSS-Port ein anderer Alias gewaehlt wird, verwendet nur dieser Port dieses Zertifikat; alle anderen sicheren Listener bleiben beim Standard. Die Sicherheitsregeln fuer Client-Zertifikate und PKI-Vertrauen werden dadurch nicht abgeschaltet.</p>
+        <p>TLS und WSS verwenden die eigene Broker-Tool-Identitaet aus dem festen Broker-PKI-Store unter <code>PLCcom/Mqtt/Broker/pki</code>. Fehlt die Identitaet oder deckt sie die Hostnamen der Standard-Listener nicht mehr ab, erzeugt oder erneuert die Library sie automatisch. Die Standard-Identitaet wird dabei einmalig erstellt und danach bei jedem Start wiederverwendet; sie wird nur erneuert, wenn ein Listener-Host noch nicht in ihrem SAN enthalten ist. Ein Client muss dem Broker-Zertifikat daher nicht nach jedem Neustart erneut vertrauen. Wird im Listener-Editor ein anderer Alias gewaehlt, verwendet nur dieser Listener dieses Zertifikat; alle anderen sicheren Listener bleiben beim Standard. Die Sicherheitsregeln fuer Client-Zertifikate und PKI-Vertrauen werden dadurch nicht abgeschaltet.</p>
         <p>Der Button <strong>Zertifikate</strong> oeffnet die lokale Zertifikatsverwaltung. Dort sehen Sie eigenes Zertifikat, trusted Zertifikate, rejected Zertifikate und Issuer.</p>
-        <h3>Client-Zertifikate</h3>
-        <p>Im Feld <strong>Client-Zertifikate</strong> legen Sie fest, ob der Broker keine, optionale oder verpflichtende Client-Zertifikate erwartet. Unbekannte Client-Zertifikate werden im Broker-PKI-Store unter <code>rejected/certs</code> abgelegt und koennen anschliessend vertraut werden.</p>
-        <p>Wichtig: Der PKI-Store beantwortet nur die technische Frage, ob ein Zertifikat vertraut ist. Die fachliche Anmeldung eines Benutzers geschieht danach im Access Validator, der Subject, Issuer, Seriennummer und Fingerprint auswerten kann.</p>
-        <div class="warning">Wenn Client-Zertifikate verpflichtend sind und der Client keines sendet, bricht der TLS-Handshake ab. Das ist korrektes Verhalten.</div>
+        <h3>Client-Zertifikatsmodus pro Listener</h3>
+        <p>Im Listener-Editor legt das Feld <strong>Client-Zertifikate</strong> pro TLS/WSS-Listener fest, wie der TLS-Handshake mit Client-Zertifikaten umgeht:</p>
+        <table class="table">
+          <tr><th>Modus</th><th>Verhalten im TLS-Handshake</th></tr>
+          <tr><td><code>NONE</code></td><td>Es wird kein Client-Zertifikat angefordert.</td></tr>
+          <tr><td><code>OPTIONAL</code></td><td>Ein Client-Zertifikat wird angefordert; Verbindungen ohne Zertifikat werden trotzdem akzeptiert. Der Access Validator kann dann beim MQTT CONNECT gezielt ablehnen.</td></tr>
+          <tr><td><code>REQUIRED</code></td><td>Ohne Client-Zertifikat scheitert bereits der TLS-Handshake - noch vor MQTT CONNECT. Richtig fuer harte mTLS-Ports.</td></tr>
+        </table>
+        <p>Unbekannte Client-Zertifikate werden im Broker-PKI-Store unter <code>rejected/certs</code> abgelegt und koennen anschliessend vertraut werden.</p>
+        <p>Wichtig: Der PKI-Store beantwortet nur die technische Frage, ob ein Zertifikat vertraut ist. Die fachliche Anmeldung eines Benutzers geschieht danach im Access Validator, der Subject, Issuer, Seriennummer und Fingerprint auswerten kann. Die Access-Regel <strong>Benutzerzertifikat verlangen</strong> ist deshalb nicht dasselbe wie der TLS-Modus <code>REQUIRED</code>.</p>
+        <div class="warning">Wenn der Client-Zertifikatsmodus <code>REQUIRED</code> ist und der Client kein Zertifikat sendet, bricht der TLS-Handshake ab. Das ist korrektes Verhalten.</div>
       </section>
 
-      <section id="access">
-        <h2>Access Validator</h2>
-        <p>Der Demo-Validator ist ein Testwerkzeug fuer die Oberflaeche. Ohne aktivierten Demo-Validator ist der Broker offen. Mit Demo-Validator koennen Sie Benutzername verlangen, ein vertrauenswuerdiges Benutzerzertifikat verlangen und Publish/Subscribe fuer einen Topic-Prefix blockieren.</p>
-        <div class="grid">
-          <div class="card"><strong>Benutzername verlangen</strong>CONNECT wird nur akzeptiert, wenn ein Benutzername mitgesendet wird.</div>
-          <div class="card"><strong>Benutzerzertifikat verlangen</strong>CONNECT wird nur akzeptiert, wenn der Client ueber TLS/WSS ein vertrautes Zertifikat sendet. Das Zertifikat ist dann die Benutzeridentitaet fuer diesen Test. Steht der TLS-Modus noch auf <code>NONE</code>, fordert das Tool beim Start trotzdem verpflichtend ein Client-Zertifikat an, damit die Regel technisch funktionieren kann.</div>
-          <div class="card"><strong>Blockierter Topic-Prefix</strong>Publish und Subscribe auf diesen Prefix werden abgelehnt.</div>
-        </div>
-        <p>Produktiv wuerde eine Anwendung einen eigenen Access Validator verwenden. Dort koennen Fingerprint, Subject, Issuer, Seriennummer oder eigene Zertifikatserweiterungen auf echte Benutzerkonten und Topic-Rechte gemappt werden. Der PKI-Store ersetzt diese Benutzer- und Rechteverwaltung nicht.</p>
-      </section>
+      <section id="access"><h2>Access Validator</h2><p>Der Access Validator prueft fachliche Zugriffsregeln nach dem MQTT CONNECT sowie bei jedem Publish und Subscribe. Standardmaessig sind alle Regeln aus: Dann wird kein Access Validator installiert und der Broker ist offen. Sobald mindestens eine Regel aktiv ist, wird der Zugriff geprueft.</p><div class="grid"><div class="card"><strong>Benutzername verlangen</strong>CONNECT ohne Benutzername wird mit MQTT Reason Code <code>0x86</code> (Bad User Name or Password) abgelehnt. Enthaelt die Benutzerliste Eintraege, muessen Benutzername und Passwort exakt zu einem Eintrag passen; bei leerer Liste genuegt ein vorhandener Benutzername.</div><div class="card"><strong>Benutzer</strong>Tragen Sie einen Benutzer pro Zeile im Format <code>user=password</code> ein. Leere Zeilen und Zeilen mit <code>#</code> am Anfang werden ignoriert. Die Liste wird nur verwendet, solange <em>Benutzername verlangen</em> aktiv ist - eine gespeicherte Liste blockiert sonst keine Verbindung.</div><div class="card"><strong>Benutzerzertifikat verlangen</strong>CONNECT ohne TLS-Client-Zertifikat wird mit MQTT Reason Code <code>0x87</code> (Not authorized) abgelehnt. Das ist eine Access-Regel, keine TLS-Einstellung: Bei Listenern mit Client-Zertifikatsmodus <code>NONE</code> fordert das Tool das Zertifikat intern optional an, damit der Broker sauber beim CONNECT ablehnen kann statt hart im TLS-Handshake zu scheitern.</div><div class="card"><strong>Blockierter Topic-Prefix</strong>Publish und Subscribe auf Topics mit diesem Prefix werden mit <code>0x87</code> abgelehnt; die Verbindung bleibt bestehen. QoS-1/2-Publishes erhalten den Fehlercode im PUBACK/PUBREC, QoS-0-Publishes werden verworfen (dort sieht der Client protokollbedingt keinen Fehler). Subscribe erhaelt den Fehlercode im SUBACK.</div></div><p>Die konfigurierte Benutzerliste wird verschluesselt in den Tool-Einstellungen gespeichert; Passwoerter werden niemals ins Log geschrieben. Produktiv wuerde eine Anwendung einen eigenen Access Validator verwenden. Dort koennen Benutzername, Fingerprint, Subject, Issuer, Seriennummer oder eigene Zertifikatserweiterungen auf echte Benutzerkonten und Topic-Rechte gemappt werden. Der PKI-Store ersetzt diese Benutzer- und Rechteverwaltung nicht.</p></section>
 
       <section id="statistics">
         <h2>Admin und Statistik</h2>
@@ -73,7 +71,9 @@
 
       <section id="log">
         <h2>Log und Diagnose</h2>
-        <p>Das Log zeigt Start/Stop, belegte Ports, Zertifikatsereignisse, Access-Entscheidungen, Admin-Aktionen und interne Diagnosemeldungen. Bei Fehlern steht die technische Ursache in der Zeile <strong>Details</strong>.</p><p>Der <strong>Diagnose-Level</strong> legt fest, ab welcher Schwere Diagnoseereignisse im Tool landen. Abgelehnte CONNECT-Versuche durch den Access Validator, zum Beispiel bei falschem Benutzer oder Passwort, erscheinen als <strong>Warning</strong>. Passwortdaten werden nicht protokolliert.</p>
+        <p>Das Log zeigt Start/Stop, belegte Ports, Zertifikatsereignisse, Access-Entscheidungen, Admin-Aktionen und interne Diagnosemeldungen. Bei Fehlern steht die technische Ursache in der Zeile <strong>Details</strong>.</p><p>Der <strong>Diagnose-Level</strong> (unten links) steuert das gesamte Log &mdash; Broker-Diagnosemeldungen und die Meldungen des Tools: <strong>Debug</strong> fuer detaillierte Fehlersuche, <strong>Info</strong> als normaler Standard, <strong>Warnings/Errors</strong> reduzieren die Ausgabe auf Probleme, <strong>Fatal</strong> zeigt nur fatale Broker-Fehler und <strong>Off</strong> blendet alles aus. Abgelehnte CONNECT-Versuche durch den Access Validator, zum Beispiel bei falschem Benutzer oder Passwort, erscheinen als <strong>Warning</strong>; Passwortdaten werden nie protokolliert. Eine Aenderung des Levels wirkt sofort auf einen laufenden Broker &mdash; ohne Neustart.</p>
+        <p><strong>Nachrichten-Payloads bei Debug.</strong> Auf der Stufe <strong>Debug</strong> erscheint zu jeder an den Broker gesendeten Nachricht ein Diagnoseeintrag mit dem genauen Inhalt &mdash; als Text, oder als Hex bei Binaerdaten, auf eine Zeile gekuerzt. Das hilft bei der Analyse; beachten Sie aber, dass Payloads sensible Daten enthalten koennen &mdash; lassen Sie <strong>Debug</strong> daher nur bei Bedarf eingeschaltet.</p>
+        <p><strong>Grosses Log-Fenster.</strong> Das Fenster-Symbol in der Log-Leiste oeffnet das Log in einer separaten, groessenveraenderbaren Live-Ansicht. Der Schalter <strong>Auto-Scroll</strong> laesst Sie entweder den neuesten Zeilen folgen oder Ihre Position halten, waehrend Sie aeltere Ausgaben lesen. <strong>Max. Zeilen</strong> begrenzt das gespeicherte Log (die aeltesten Zeilen fallen weg), damit lange Test-Sitzungen fluessig bleiben.</p>
         <p>Die Log-Buttons links kopieren, speichern oder leeren die Ausgabe. Fuer Supportfaelle ist der kopierte Log oft aussagekraeftiger als ein Screenshot.</p>
       </section>
 
@@ -84,12 +84,12 @@
           <tr><td>Address already in use</td><td>Port wird bereits von Mosquitto oder einem anderen Broker verwendet.</td><td>Anderen Port verwenden oder fremden Dienst stoppen.</td></tr>
           <tr><td>TLS startet nicht</td><td>Eigene Broker-Identitaet fehlt oder Passwort ist falsch.</td><td>Zertifikatsmanager pruefen, Identitaet erzeugen oder Passwort korrigieren.</td></tr>
           <tr><td>bad_certificate</td><td>Client-Zertifikat fehlt oder ist nicht vertraut.</td><td>Client-Zertifikat senden und im Broker-Tool vertrauen.</td></tr>
-          <tr><td>Client darf nicht publishen</td><td>Demo-Validator blockiert das Topic.</td><td>Prefix pruefen oder Demo-Validator deaktivieren.</td></tr>
+          <tr><td>Client darf nicht publishen</td><td>Der blockierte Topic-Prefix des Access Validators trifft zu.</td><td>Prefix pruefen oder Feld leeren.</td></tr>
           <tr><td>Keine Verbindung von anderem Rechner</td><td>Bind-Adresse ist <code>127.0.0.1</code> oder Firewall blockiert.</td><td><code>0.0.0.0</code> bewusst setzen und Firewall pruefen.</td></tr>
         </table>
       </section>
     </div>
   </main>
-  <footer class="footer">PLCcom MQTT Broker Tool 2.1.1 - lokale Hilfe, offline ausgeliefert mit der Anwendung.</footer>
+  <footer class="footer">PLCcom MQTT Broker Tool 2.x.x - lokale Hilfe, offline ausgeliefert mit der Anwendung.</footer>
 </body>
 </html>

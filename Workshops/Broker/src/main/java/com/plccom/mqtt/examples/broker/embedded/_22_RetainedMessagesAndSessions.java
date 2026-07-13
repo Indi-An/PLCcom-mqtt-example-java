@@ -120,7 +120,7 @@ public final class _22_RetainedMessagesAndSessions {
         System.out.println();
 
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .tcpPort(0)
+                .tcpPort(1883) // 1883 is the standard MQTT-over-TCP port
                 .start();
         try {
             // -- Step 1: publish a retained value BEFORE anyone listens -------

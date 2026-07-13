@@ -135,9 +135,31 @@ public final class _23_RequestResponse {
         System.out.println("  Broker endpoint : " + brokerEndpoint());
         System.out.println();
 
-        // Two ordinary MQTT 5 clients: one asks, one answers.
-        PlccomMqttClient requester = connectedClient("plccom-workshop-23-requester");
-        PlccomMqttClient responder = connectedClient("plccom-workshop-23-responder");
+        // Two ordinary MQTT 5 clients: one asks, one answers. Both are built and
+        // connected right here, and each CONNECT result is checked in place.
+        PlccomMqttClient requester = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-23-requester")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        PlccomMqttConnectResult requesterConnect = requester.connect();
+        if (!requesterConnect.isGood()) {
+            throw new IllegalStateException("CONNECT (requester) failed: "
+                    + requesterConnect.getQuality() + " - " + requesterConnect.getMessage());
+        }
+
+        PlccomMqttClient responder = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-23-responder")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        PlccomMqttConnectResult responderConnect = responder.connect();
+        if (!responderConnect.isGood()) {
+            throw new IllegalStateException("CONNECT (responder) failed: "
+                    + responderConnect.getQuality() + " - " + responderConnect.getMessage());
+        }
         try {
             // -- Step 1: the responder listens for requests -------------------
             // It subscribes to the request topic and, for each request, replies
@@ -189,21 +211,6 @@ public final class _23_RequestResponse {
             responder.close();
             requester.close();
         }
-    }
-
-    private static PlccomMqttClient connectedClient(String clientId) throws Exception {
-        PlccomMqttClient client = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .identifier(clientId)
-                .endpoint(brokerEndpoint())
-                .mqtt5()
-                .keepAliveSeconds(30)
-                .build();
-        PlccomMqttConnectResult result = client.connect();
-        if (!result.isGood()) {
-            throw new IllegalStateException("CONNECT failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-        return client;
     }
 
     private static String brokerEndpoint() {

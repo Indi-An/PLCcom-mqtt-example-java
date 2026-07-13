@@ -22,6 +22,7 @@
 package com.plccom.mqtt.examples.broker.basics;
 
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 import com.plccom.console.PLCcomConsole;
 import com.plccom.mqtt.broker.PlccomMqttBroker;
@@ -54,7 +55,9 @@ import com.plccom.mqtt.pki.PlccomMqttOwnCertificate;
  *                            no port-specific assignment (defaultTlsCertificate).
  *   - Per-port certificate : a certificate bound to one concrete local port with
  *                            assignTlsCertificateToPort(port, cert); it wins over
- *                            the default for that port.
+ *                            the default for that port. The broker uses an
+ *                            explicit certificate as-is; make sure its SAN list
+ *                            matches the endpoint host clients will use.
  *
  * EXPECTED RESULT
  *   The broker reports its TCP, WS, TLS and WSS ports; the TLS port uses the
@@ -71,13 +74,12 @@ public final class _14_AllListenerTypes {
 
     private static final String BIND_ADDRESS = "127.0.0.1";
 
-    // Example ports for the four listeners. Change them to fit your deployment;
-    // they are deliberately non-standard here so the workshop does not clash with
-    // another MQTT broker that may already use 1883 / 8883 on this machine.
-    private static final int TCP_PORT = 11883; // plain TCP  (mqtt)
-    private static final int WS_PORT  = 18080; // plain WebSocket (ws)
-    private static final int TLS_PORT = 18883; // TLS        (mqtts) - per-port certificate
-    private static final int WSS_PORT = 18443; // secure WebSocket (wss) - default certificate
+    // The standard MQTT ports for the four transports. Change them to fit your
+    // deployment; if one is already in use locally (another broker), stop it first.
+    private static final int TCP_PORT = 1883; // plain TCP  (mqtt)
+    private static final int WS_PORT  = 8080; // plain WebSocket (ws)
+    private static final int TLS_PORT = 8883; // TLS        (mqtts) - per-port certificate
+    private static final int WSS_PORT = 8443; // secure WebSocket (wss) - default certificate
 
     // Auto-created certificates in the local PKI folder.
     private static final String PKI_FOLDER    = "./pki";
@@ -142,6 +144,8 @@ public final class _14_AllListenerTypes {
                 Paths.get(PKI_FOLDER), DEFAULT_ALIAS, CERT_PASSWORD, CERT_VALID_DAYS);
         PlccomMqttOwnCertificate perPortCertificate = new PlccomMqttOwnCertificate(
                 Paths.get(PKI_FOLDER), SPECIAL_ALIAS, CERT_PASSWORD, CERT_VALID_DAYS);
+        defaultCertificate.loadOrCreateForServerHosts(Arrays.asList(BIND_ADDRESS));
+        perPortCertificate.loadOrCreateForServerHosts(Arrays.asList(BIND_ADDRESS));
 
         // -- Step 2: start all four listeners on one broker -------------------
         // defaultTlsCertificate(...) provides the identity for TLS listeners with
@@ -149,6 +153,8 @@ public final class _14_AllListenerTypes {
         // overrides the identity for exactly that port. The 2-argument
         // tlsListener / secureWebSocketListener then resolve their certificate
         // from these settings (per-port assignment wins, otherwise the default).
+        // Because explicit certificates are used as-is, this workshop prepares
+        // both certificate files above with BIND_ADDRESS in the SAN list.
         System.out.println("  Starting TCP, WS, TLS and WSS listeners on one broker ...");
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
                 .defaultTlsCertificate(defaultCertificate)
@@ -178,3 +184,4 @@ public final class _14_AllListenerTypes {
         }
     }
 }
+

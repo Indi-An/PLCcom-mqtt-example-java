@@ -1,12 +1,33 @@
+// MIT License
+// Copyright (c) Indi.An GmbH
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
 package com.plccom.mqtt.tools.client;
 
-import java.awt.BorderLayout;
-import java.awt.Desktop;
 import java.awt.BasicStroke;
+import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Container;
 import java.awt.Cursor;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -18,8 +39,8 @@ import java.awt.Image;
 import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.Toolkit;
-import java.awt.event.ActionEvent;
 import java.awt.datatransfer.StringSelection;
+import java.awt.event.ActionEvent;
 import java.awt.image.BaseMultiResolutionImage;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -56,30 +77,36 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import javax.crypto.Cipher;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.imageio.ImageIO;
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultComboBoxModel;
-import javax.swing.ImageIcon;
 import javax.swing.Icon;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
+import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
-import javax.swing.JDialog;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
-import javax.swing.JOptionPane;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.JTextPane;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -92,17 +119,16 @@ import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.text.BadLocationException;
+import javax.swing.text.DefaultCaret;
+import javax.swing.text.JTextComponent;
 import javax.swing.text.Style;
 import javax.swing.text.StyleConstants;
 import javax.swing.text.StyledDocument;
-import javax.swing.JTextPane;
-import javax.swing.text.JTextComponent;
-import javax.crypto.Cipher;
-import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.PBEKeySpec;
-import javax.crypto.spec.SecretKeySpec;
 
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.plccom.mqtt.OperationResult;
 import com.plccom.mqtt.client.MqttClientPublishBuilder;
 import com.plccom.mqtt.client.MqttClientSubscribeBuilder;
@@ -114,11 +140,13 @@ import com.plccom.mqtt.client.MqttSubscribeResult;
 import com.plccom.mqtt.client.PlccomMqttClient;
 import com.plccom.mqtt.client.PlccomMqttClientBuilder;
 import com.plccom.mqtt.client.PlccomMqttClientFactory;
+import com.plccom.mqtt.client.PlccomMqttEndpoint;
 import com.plccom.mqtt.client.PlccomMqttException;
 import com.plccom.mqtt.client.PlccomMqttProtocolVersion;
 import com.plccom.mqtt.client.PlccomMqttPublishMessage;
 import com.plccom.mqtt.client.PlccomMqttRetainHandling;
 import com.plccom.mqtt.client.PlccomMqttTlsOptions;
+import com.plccom.mqtt.core.VersionInfo;
 import com.plccom.mqtt.diagnostics.PlccomMqttDiagnosticEvent;
 import com.plccom.mqtt.diagnostics.PlccomMqttDiagnosticLevel;
 import com.plccom.mqtt.pki.PlccomMqttOwnCertificate;
@@ -144,6 +172,12 @@ public final class PlccomMqttClientToolApp {
     private static final String MESSAGE_BUNDLE =
             "com.plccom.mqtt.tools.client.messages";
     private static final String DEFAULT_ENDPOINT = "mqtt://127.0.0.1:1883";
+    private static final String PAYLOAD_FORMAT_PLAINTEXT = "Plaintext";
+    private static final String PAYLOAD_FORMAT_JSON = "JSON";
+    private static final String PAYLOAD_FORMAT_BASE64 = "Base64";
+    private static final String PAYLOAD_FORMAT_HEX = "Hex";
+    private static final String PAYLOAD_JSON_TEMPLATE =
+            "{\n  \"msg\": \"Hello from PLCcom Client\"\n}";
     private static final String ENDPOINT_TRANSPORT_TCP = "TCP";
     private static final String ENDPOINT_TRANSPORT_TLS = "TLS";
     private static final String ENDPOINT_TRANSPORT_WS = "WebSocket";
@@ -154,6 +188,10 @@ public final class PlccomMqttClientToolApp {
     private static final String DEFAULT_OWN_CERTIFICATE_ALIAS = APPLICATION_NAME;
     private static final String SETTINGS_FILE_NAME = "client-tool.properties";
     private static final String ENCRYPTED_PREFIX = "enc:v1:";
+    // Fixed application salt (the ASCII bytes of "PLCcomMQTTTools1") for the PBKDF2
+    // settings-key derivation. A constant salt is acceptable here because the derived
+    // key only obfuscates locally stored secrets on this account; it is not a password
+    // hash meant to resist offline cracking.
     private static final byte[] SETTINGS_SALT = new byte[] {
             80, 76, 67, 99, 111, 109, 77, 81, 84, 84, 84, 111, 111, 108, 115, 49
     };
@@ -180,6 +218,10 @@ public final class PlccomMqttClientToolApp {
     private static final int LOGO_HEIGHT = 30;
     private static final int STATUS_BADGE_WIDTH = 150;
 
+    // Shared infrastructure. Every network operation runs on this single-thread
+    // executor so the Swing event dispatch thread never blocks; the maps remember
+    // which resource key each widget shows so the whole UI can be re-translated
+    // and re-themed live when the language or theme is switched.
     private final ExecutorService executor = Executors.newSingleThreadExecutor(r -> {
         Thread thread = new Thread(r, "PLCcom-MQTT-Client-Tool");
         thread.setDaemon(true);
@@ -189,21 +231,28 @@ public final class PlccomMqttClientToolApp {
     private final Map<JLabel, String> labelKeys = new LinkedHashMap<JLabel, String>();
     private final Map<AbstractButton, String> buttonKeys = new LinkedHashMap<AbstractButton, String>();
     private final Map<JComponent, String> tooltipKeys = new LinkedHashMap<JComponent, String>();
+    // Buttons that should be painted in the accent colour (the primary action of a tab).
     private final Set<AbstractButton> primaryButtons =
             java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<AbstractButton, Boolean>());
     private final List<String> tabKeys = new ArrayList<String>();
+    // Fingerprints already offered for trust, so we prompt once per rejected certificate.
     private final Set<String> promptedRejectedCertificates = ConcurrentHashMap.newKeySet();
 
+    // Mutable application state: current language, theme, status and the live client.
     private Locale locale = Locale.GERMAN;
     private ResourceBundle texts = ResourceBundle.getBundle(MESSAGE_BUNDLE, locale);
     private Palette palette = Palette.dark();
     private Status currentStatus = Status.NEUTRAL;
-    private PlccomMqttClient client;
+    // Written on the single background worker thread and read from the Swing
+    // event dispatch thread (button states, status text), so it is volatile for
+    // the reading thread to observe the latest value reliably.
+    private volatile PlccomMqttClient client;
     private boolean settingsPersistenceEnabled = true;
     private boolean settingsSaved;
     private boolean settingsAutoSaveInstalled;
     private Timer settingsAutoSaveTimer;
 
+    // Top-level window plus the header and footer widgets and the log panel.
     private JFrame frame;
     private JPanel root;
     private JLabel titleLabel;
@@ -222,6 +271,8 @@ public final class PlccomMqttClientToolApp {
     private JTabbedPane tabs;
     private final AtomicBoolean operationActive = new AtomicBoolean();
 
+    // Connection tab: license, endpoint, protocol, credentials, timeouts,
+    // diagnostics, TLS/PKI and the optional Last Will message.
     private JTextField licenseUserField;
     private JTextField licenseSerialField;
     private JTextField endpointField;
@@ -237,7 +288,10 @@ public final class PlccomMqttClientToolApp {
     private JSpinner connectTimeoutSpinner;
     private JSpinner operationTimeoutSpinner;
     private JComboBox<String> diagnosticLevelCombo;
-    private JSpinner diagnosticThrottleSpinner;
+    // Mirror of the diagnostic-level combo for the tool's own log filter. Kept in
+    // a volatile field because log helpers run on SDK worker threads, which must
+    // not touch the Swing combo directly.
+    private volatile PlccomMqttDiagnosticLevel uiLogLevel = PlccomMqttDiagnosticLevel.INFO;
     private JPasswordField clientCertificatePasswordField;
     private JTextField clientPkiStoreField;
     private JTextField clientPkiOwnAliasField;
@@ -251,9 +305,12 @@ public final class PlccomMqttClientToolApp {
     private JSpinner lastWillExpirySpinner;
     private JTextField lastWillContentTypeField;
 
+    // Publish tab: topic, payload and QoS plus the MQTT 5 message properties.
     private JTextField publishTopicField;
     private JTextArea publishPayloadArea;
     private JComboBox<String> publishQosCombo;
+    private JComboBox<String> publishFormatCombo;
+    private String currentPayloadFormat = PAYLOAD_FORMAT_PLAINTEXT;
     private JCheckBox retainCheck;
     private JTextField contentTypeField;
     private JSpinner messageExpirySpinner;
@@ -262,10 +319,12 @@ public final class PlccomMqttClientToolApp {
     private JTextField userPropertyNameField;
     private JTextField userPropertyValueField;
 
+    // Request/response tab: publishes to a request topic and waits for the reply.
     private JTextField requestTopicField;
     private JTextField requestResponseTopicField;
     private JTextArea requestPayloadArea;
 
+    // Subscribe tab: topic filter, QoS and the MQTT 5 subscription options.
     private JTextField subscribeTopicField;
     private JComboBox<String> subscribeQosCombo;
     private JCheckBox sharedSubscriptionCheck;
@@ -276,7 +335,6 @@ public final class PlccomMqttClientToolApp {
     private JCheckBox subscriptionIdentifierCheck;
     private JSpinner subscriptionIdentifierSpinner;
     private JSpinner receiveTimeoutSpinner;
-
 
     /**
      * Starts the standalone client test application.
@@ -293,12 +351,15 @@ public final class PlccomMqttClientToolApp {
             SwingUtilities.invokeAndWait(() -> {
                 PlccomMqttClientToolApp app = new PlccomMqttClientToolApp();
                 app.settingsPersistenceEnabled = false;
+                if (startup.english) {
+                    // Apply the language before show() so the initial log line and
+                    // all texts render in the selected language.
+                    app.locale = Locale.ENGLISH;
+                    app.texts = ResourceBundle.getBundle(MESSAGE_BUNDLE, Locale.ENGLISH);
+                }
                 app.show();
                 if (startup.light) {
                     app.setLightTheme();
-                }
-                if (startup.english) {
-                    app.setLanguage(Locale.ENGLISH);
                 }
                 if (startup.tabIndex >= 0 && startup.tabIndex < app.tabs.getTabCount()) {
                     app.tabs.setSelectedIndex(startup.tabIndex);
@@ -320,6 +381,10 @@ public final class PlccomMqttClientToolApp {
         SwingUtilities.invokeLater(() -> new PlccomMqttClientToolApp().show());
     }
 
+    /**
+     * Builds the window, restores the saved settings and shows the application.
+     * Runs on the Swing event dispatch thread.
+     */
     private void show() {
         buildUi();
         loadSettings();
@@ -332,8 +397,15 @@ public final class PlccomMqttClientToolApp {
         logInfo("log.ready");
     }
 
+    /**
+     * Assembles the whole window: the header on top, the license bar, the tabbed
+     * configuration area and the log panel in the centre, and the action footer at
+     * the bottom. This only lays out the widgets; their texts and colours are
+     * applied afterwards by {@link #translate()} and {@link #applyTheme()}.
+     */
     private void buildUi() {
         frame = new JFrame();
+        frame.setIconImages(loadAppIcons());
         frame.setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         frame.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
@@ -360,6 +432,10 @@ public final class PlccomMqttClientToolApp {
         frame.setLocationRelativeTo(null);
     }
 
+    /**
+     * Builds the top header: the PLCcom logo on the left, the application title and
+     * subtitle in the middle, and the status pill (Ready/Connected/...) on the right.
+     */
     private JPanel createHeader() {
         JPanel header = new JPanel(new BorderLayout(14, 0));
         header.setName("header");
@@ -391,12 +467,30 @@ public final class PlccomMqttClientToolApp {
         return header;
     }
 
+    /**
+     * Builds the bottom footer: the diagnostic-level selector on the left and the
+     * global action buttons (theme, language, certificates, help, exit) on the right.
+     */
     private JPanel createFooterActions() {
         JPanel footer = new JPanel(new BorderLayout(8, 0));
         footer.setName("footer");
         footer.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(1, 0, 0, 0, palette.border),
                 new EmptyBorder(8, 16, 10, 16)));
+
+        // Diagnostic level lives in the footer (left side), mirroring the Broker
+        // tool, so the Connection tab stays focused on connection settings. It
+        // gets its own docked area so its label never crowds the action buttons.
+        JPanel diagnostics = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        diagnostics.setOpaque(false);
+        JLabel diagnosticLevelLabel = label("connect.diagnosticLevel");
+        diagnosticLevelLabel.setFont(diagnosticLevelLabel.getFont().deriveFont(Font.PLAIN, 12f));
+        // A few px of trailing slack so the last glyph is never clipped when the
+        // label is painted off-screen for screenshots.
+        diagnosticLevelLabel.setBorder(new EmptyBorder(0, 0, 0, 6));
+        diagnostics.add(diagnosticLevelLabel);
+        diagnostics.add(diagnosticLevelCombo);
+        footer.add(diagnostics, BorderLayout.WEST);
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         actions.setOpaque(false);
@@ -414,6 +508,10 @@ public final class PlccomMqttClientToolApp {
         return footer;
     }
 
+    /**
+     * Builds the license bar shown above the tabs: the user and serial fields plus a
+     * hint linking to the download page where a free trial license can be created.
+     */
     private JPanel createLicenseBar() {
         JPanel panel = cardPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -426,13 +524,19 @@ public final class PlccomMqttClientToolApp {
         gbc.gridy = 0;
         panel.add(title, gbc);
 
-        JLabel hint = label("license.hint");
+        JPanel hintRow = new JPanel();
+        hintRow.setLayout(new BoxLayout(hintRow, BoxLayout.X_AXIS));
+        hintRow.setOpaque(false);
+        hintRow.add(label("license.hint"));
+        hintRow.add(javax.swing.Box.createHorizontalStrut(6));
+        hintRow.add(createDownloadLink());
+        hintRow.add(javax.swing.Box.createHorizontalGlue());
         gbc.gridx = 1;
         gbc.gridy = 0;
         gbc.gridwidth = 4;
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.weightx = 1;
-        panel.add(hint, gbc);
+        panel.add(hintRow, gbc);
         gbc.gridwidth = 1;
 
         gbc.gridx = 1;
@@ -460,6 +564,10 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /**
+     * Creates the five configuration tabs (Connection, Publish, Subscribe,
+     * Request/response, Messages) and keeps their titles translatable.
+     */
     private JTabbedPane createTabs() {
         tabs = new JTabbedPane();
         tabs.addChangeListener(event -> refreshTabTitles());
@@ -472,11 +580,17 @@ public final class PlccomMqttClientToolApp {
         return tabs;
     }
 
+    /** Adds a tab and remembers its resource key so the title can be re-translated. */
     private void addToolTab(String key, Component content) {
         tabKeys.add(key);
         tabs.addTab(t(key), content);
     }
 
+    /**
+     * Re-applies the (possibly translated) tab titles and paints a custom header
+     * label for each tab, drawing an accent underline under the selected one. Also
+     * runs on every selection change so the highlight follows the user.
+     */
     private void refreshTabTitles() {
         if (tabs == null) {
             return;
@@ -498,7 +612,15 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Builds the Connection tab. Every widget is created first, then arranged in two
+     * side-by-side forms: the left column holds the connection basics (endpoint,
+     * client id, protocol, options, client certificate and Last Will), the right
+     * column holds credentials and timeouts. Connect and Disconnect sit in the
+     * action bar along the bottom.
+     */
     private Component createConnectionPanel() {
+        // 1) Create every widget on this tab first; the layout is assembled afterwards.
         endpointField = textField(34, DEFAULT_ENDPOINT);
         JButton endpointAssistantButton = button("button.endpointAssistant", this::showEndpointAssistant);
         primaryButtons.add(endpointAssistantButton);
@@ -518,7 +640,9 @@ public final class PlccomMqttClientToolApp {
         operationTimeoutSpinner = spinner(10000, 0, 600000, 1000);
         diagnosticLevelCombo = combo("Debug / all", "Info", "Warnings", "Errors", "Fatal only", "Off");
         diagnosticLevelCombo.setSelectedIndex(1);
-        diagnosticThrottleSpinner = spinner(1000, 0, 60000, 250);
+        // Push level changes to a live client immediately, so switching the
+        // level takes effect at once instead of only on the next connect.
+        diagnosticLevelCombo.addActionListener(event -> applyRuntimeDiagnosticLevel());
         clientCertificatePasswordField = new JPasswordField(16);
         normalizeControlHeight(clientCertificatePasswordField);
         clientPkiStoreField = textField(24, DEFAULT_PKI_FOLDER);
@@ -536,6 +660,7 @@ public final class PlccomMqttClientToolApp {
         lastWillExpirySpinner = plainSpinner(0, 0, Integer.MAX_VALUE, 10);
         lastWillContentTypeField = textField(22, "text/plain");
 
+        // 2) Assemble the layout: two form columns inside a GridBag, action bar below.
         JPanel panel = new JPanel(new BorderLayout(8, 8));
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
@@ -546,6 +671,8 @@ public final class PlccomMqttClientToolApp {
         columnGbc.fill = GridBagConstraints.BOTH;
         columnGbc.weighty = 1;
 
+        // Left column: connection basics (endpoint, client id, protocol, options,
+        // client certificate and the Last Will toggle).
         JPanel connectionPanel = formPanel();
         GridBagConstraints connectionGbc = formGbc();
         int connectionRow = 0;
@@ -564,6 +691,7 @@ public final class PlccomMqttClientToolApp {
                 fixedInlineRow(lastWillCheck, lastWillSettingsButton));
         addFormBottomFiller(connectionPanel, connectionGbc, connectionRow);
 
+        // Right column: credentials and timeouts.
         JPanel optionsPanel = formPanel();
         GridBagConstraints optionsGbc = formGbc();
         int optionsRow = 0;
@@ -573,10 +701,9 @@ public final class PlccomMqttClientToolApp {
         addRow(optionsPanel, optionsGbc, optionsRow++, "connect.topicAlias", toolInput(topicAliasSpinner));
         addRow(optionsPanel, optionsGbc, optionsRow++, "connect.connectTimeout", toolInput(connectTimeoutSpinner));
         addRow(optionsPanel, optionsGbc, optionsRow++, "connect.operationTimeout", toolInput(operationTimeoutSpinner));
-        addRow(optionsPanel, optionsGbc, optionsRow++, "connect.diagnosticLevel", toolInput(diagnosticLevelCombo));
-        addRow(optionsPanel, optionsGbc, optionsRow++, "connect.diagnosticThrottle", toolInput(diagnosticThrottleSpinner));
         addFormBottomFiller(optionsPanel, optionsGbc, optionsRow);
 
+        // Place the two columns with a ~56/44 width split (basics slightly wider).
         columnGbc.gridx = 0;
         columnGbc.weightx = 0.56;
         columnGbc.insets = new Insets(0, 0, 0, 5);
@@ -588,13 +715,20 @@ public final class PlccomMqttClientToolApp {
         columns.add(optionsPanel, columnGbc);
         panel.add(columns, BorderLayout.CENTER);
 
+        // 3) Action bar: Connect is the primary (accent) action, Disconnect next to it.
         connectButton = primaryButton("button.connect", this::connect);
         disconnectButton = button("button.disconnect", this::disconnect);
         panel.add(actionBar(connectButton, disconnectButton), BorderLayout.SOUTH);
         return panel;
     }
 
+    /**
+     * Builds the Last Will editor used inside {@link #showLastWillDialog()}: the
+     * message basics (topic, payload, QoS, retain) on the left and the MQTT 5 will
+     * properties (delay, message expiry, content type) on the right.
+     */
     private JPanel createLastWillPanel() {
+        // A bordered card with a bold title on top and two side-by-side forms below.
         JPanel outer = cardPanel(new BorderLayout(0, 8));
         outer.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(palette.border),
@@ -612,6 +746,7 @@ public final class PlccomMqttClientToolApp {
         columnGbc.fill = GridBagConstraints.BOTH;
         columnGbc.weighty = 1;
 
+        // Left column: the Last Will message basics (topic, payload, QoS, retain).
         JPanel messagePanel = formPanel();
         messagePanel.setBorder(BorderFactory.createEmptyBorder());
         GridBagConstraints messageGbc = formGbc();
@@ -622,6 +757,8 @@ public final class PlccomMqttClientToolApp {
         addRow(messagePanel, messageGbc, messageRow++, "will.qos", toolInput(lastWillQosCombo));
         addRow(messagePanel, messageGbc, messageRow++, "will.flags", toolInput(lastWillRetainCheck));
 
+        // Right column: the MQTT 5 will properties (publish delay, message expiry,
+        // content type). MQTT 3.1.1 brokers simply ignore these.
         JPanel mqtt5Panel = formPanel();
         mqtt5Panel.setBorder(BorderFactory.createEmptyBorder());
         GridBagConstraints mqtt5Gbc = formGbc();
@@ -630,6 +767,7 @@ public final class PlccomMqttClientToolApp {
         addRow(mqtt5Panel, mqtt5Gbc, mqtt5Row++, "will.expiry", toolInput(lastWillExpirySpinner));
         addRow(mqtt5Panel, mqtt5Gbc, mqtt5Row++, "will.contentType", toolInput(lastWillContentTypeField));
 
+        // Give the message column a bit more width than the properties column (~58/42).
         columnGbc.gridx = 0;
         columnGbc.weightx = 0.58;
         columnGbc.insets = new Insets(0, 0, 0, 5);
@@ -642,7 +780,9 @@ public final class PlccomMqttClientToolApp {
         return outer;
     }
 
+    /** Opens the Last Will editor in a modal dialog anchored to the main window. */
     private void showLastWillDialog() {
+        // Wrap the shared Last Will panel in a modal dialog with a single Close button.
         JDialog dialog = new JDialog(frame, t("will.dialog.title"), true);
         JPanel content = new JPanel(new BorderLayout(0, 10));
         content.setBorder(new EmptyBorder(12, 12, 12, 12));
@@ -652,7 +792,9 @@ public final class PlccomMqttClientToolApp {
         JPanel footer = actionBar(closeButton);
         content.add(footer, BorderLayout.SOUTH);
         dialog.setContentPane(content);
-        theme(content);
+        theme(content); // match the current theme
+        // The Last Will fields are only edited here, so they are always enabled while
+        // the dialog is open regardless of the main window's connection state.
         setLastWillFieldsEnabled(true);
         dialog.pack();
         dialog.setMinimumSize(new Dimension(760, 360));
@@ -660,12 +802,20 @@ public final class PlccomMqttClientToolApp {
         dialog.setVisible(true);
     }
 
+    /**
+     * Builds the Publish tab: the message itself (topic, format, payload, QoS,
+     * retain) on the left and the MQTT 5 publish properties on the right, with
+     * Publish and "Delete retained" in the action bar.
+     */
     private Component createPublishPanel() {
+        // Create the Publish-tab widgets first; the layout follows below.
         publishTopicField = textField(32, "plccom/tool/client/demo");
         publishPayloadArea = new JTextArea("Hello from PLCcom MQTT Client Tool", 5, 48);
         publishPayloadArea.setLineWrap(true);
         publishPayloadArea.setWrapStyleWord(true);
         publishQosCombo = combo("QoS 0", "QoS 1", "QoS 2");
+        publishFormatCombo = combo(PAYLOAD_FORMAT_PLAINTEXT, PAYLOAD_FORMAT_JSON,
+                PAYLOAD_FORMAT_BASE64, PAYLOAD_FORMAT_HEX);
         retainCheck = checkBox("publish.retain", false);
         contentTypeField = textField(24, "text/plain");
         messageExpirySpinner = plainSpinner(0, 0, Integer.MAX_VALUE, 10);
@@ -684,16 +834,20 @@ public final class PlccomMqttClientToolApp {
         columnGbc.fill = GridBagConstraints.BOTH;
         columnGbc.weighty = 1;
 
+        // Left column: the message itself (topic, format, payload, QoS, retain).
         JPanel messagePanel = formPanel();
         GridBagConstraints messageGbc = formGbc();
         int messageRow = 0;
         addRow(messagePanel, messageGbc, messageRow++, "publish.topic", toolInput(publishTopicField));
+        addRow(messagePanel, messageGbc, messageRow++, "publish.format", toolInput(publishFormatCombo));
         addRow(messagePanel, messageGbc, messageRow++, "publish.payload",
                 fixedToolArea(publishPayloadArea, PAYLOAD_AREA_HEIGHT));
         addRow(messagePanel, messageGbc, messageRow++, "publish.qos", toolInput(publishQosCombo));
         addRow(messagePanel, messageGbc, messageRow++, "publish.flags", toolInput(retainCheck));
         addFormBottomFiller(messagePanel, messageGbc, messageRow);
 
+        // Right column: the MQTT 5 publish properties (content type, message expiry,
+        // response topic, correlation data and one user property).
         JPanel propertiesPanel = formPanel();
         GridBagConstraints propertiesGbc = formGbc();
         int propertiesRow = 0;
@@ -722,13 +876,18 @@ public final class PlccomMqttClientToolApp {
         columns.add(propertiesPanel, columnGbc);
         panel.add(columns, BorderLayout.CENTER);
 
+        // Action bar: Publish (primary) plus "Delete retained" (an empty retained publish).
         panel.add(actionBar(
                 primaryButton("button.publish", this::publish),
-                button("button.publishJson", this::publishJson),
                 button("button.deleteRetained", this::deleteRetained)), BorderLayout.SOUTH);
         return panel;
     }
 
+    /**
+     * Builds the Request/response tab, which publishes a request and waits for a
+     * reply on the response topic. The left form holds topic, response topic and
+     * payload; the right card explains the round-trip.
+     */
     private Component createRequestPanel() {
         requestTopicField = textField(32, "request/plccom");
         requestResponseTopicField = textField(32, "response/plccom/client");
@@ -746,6 +905,7 @@ public final class PlccomMqttClientToolApp {
         columnGbc.fill = GridBagConstraints.BOTH;
         columnGbc.weighty = 1;
 
+        // Left column: the request itself (request topic, response topic, payload).
         JPanel requestForm = formPanel();
         GridBagConstraints requestGbc = formGbc();
         int requestRow = 0;
@@ -756,6 +916,7 @@ public final class PlccomMqttClientToolApp {
                 fixedToolArea(requestPayloadArea, PAYLOAD_AREA_HEIGHT));
         addFormBottomFiller(requestForm, requestGbc, requestRow);
 
+        // Right column: a short explanation card describing the request/response round-trip.
         JPanel infoCard = formPanel();
         GridBagConstraints infoGbc = formGbc();
         infoGbc.gridx = 0;
@@ -782,6 +943,12 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /**
+     * Builds the Subscribe tab: the subscription basics (topic filter, QoS, shared
+     * group, receive timeout) on the left and the MQTT 5 subscription options
+     * (no-local, retain-as-published, retain handling, subscription identifier) on
+     * the right. Subscribe, "Receive once" and "Unsubscribe all" sit at the bottom.
+     */
     private Component createSubscribePanel() {
         subscribeTopicField = textField(34, "plccom/tool/client/#");
         subscribeQosCombo = combo("QoS 0", "QoS 1", "QoS 2");
@@ -804,6 +971,7 @@ public final class PlccomMqttClientToolApp {
         columnGbc.fill = GridBagConstraints.BOTH;
         columnGbc.weighty = 1;
 
+        // Left column: subscription basics (topic filter, QoS, shared group, receive timeout).
         JPanel subscriptionPanel = formPanel();
         GridBagConstraints subscriptionGbc = formGbc();
         int subscriptionRow = 0;
@@ -817,6 +985,8 @@ public final class PlccomMqttClientToolApp {
                 toolInput(receiveTimeoutSpinner));
         addFormBottomFiller(subscriptionPanel, subscriptionGbc, subscriptionRow);
 
+        // Right column: the MQTT 5 subscription options (no-local, retain-as-published,
+        // retain handling, subscription identifier).
         JPanel mqtt5Panel = formPanel();
         GridBagConstraints mqtt5Gbc = formGbc();
         int mqtt5Row = 0;
@@ -839,6 +1009,7 @@ public final class PlccomMqttClientToolApp {
         columns.add(mqtt5Panel, columnGbc);
         panel.add(columns, BorderLayout.CENTER);
 
+        // Action bar: Subscribe (primary), plus one-shot receive and unsubscribe-all.
         panel.add(actionBar(
                 primaryButton("button.subscribe", this::subscribe),
                 button("button.receiveOnce", this::receiveOnce),
@@ -846,6 +1017,11 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /**
+     * Builds the Messages tab: a read-only table listing every received message
+     * (time, topic, QoS, retain, payload, content type and subscription ids) with a
+     * button to clear it.
+     */
     private Component createMessagesPanel() {
         messageModel = new DefaultTableModel(new Object[] {
                 "Time", "Topic", "QoS", "Retain", "Payload", "Content Type", "Subscription IDs" }, 0) {
@@ -869,6 +1045,7 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /** Wraps the shared {@link LogPanel} in a fixed-height container below the tabs. */
     private Component createLogPanel() {
         logPanel = new LogPanel();
         JPanel outer = new JPanel(new BorderLayout(0, 0));
@@ -877,6 +1054,11 @@ public final class PlccomMqttClientToolApp {
         return outer;
     }
 
+    /**
+     * Connects to the broker using the settings currently shown in the UI. Runs on
+     * the background worker thread; any failure (including an invalid license) is
+     * reported in the tool log.
+     */
     private void connect() {
         PlccomMqttClient current = client;
         if (current != null && current.isConnected()) {
@@ -904,7 +1086,6 @@ public final class PlccomMqttClientToolApp {
                     .connectTimeoutMillis(number(connectTimeoutSpinner))
                     .operationTimeoutMillis(number(operationTimeoutSpinner))
                     .diagnosticLevel(selectedDiagnosticLevel(diagnosticLevelCombo))
-                    .diagnosticThrottleMillis(number(diagnosticThrottleSpinner))
                     .onDiagnostic(this::diagnostic)
                     .onConnected(ctx -> logSuccess("log.connected.details",
                             ctx.clientId(), ctx.negotiatedProtocolVersion(), ctx.sessionPresent()))
@@ -930,6 +1111,7 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /** Closes the active client and returns the tool to its idle state. */
     private void disconnect() {
         PlccomMqttClient current = client;
         if (current == null || !current.isConnected()) {
@@ -944,16 +1126,27 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /**
+     * Publishes the message from the Publish tab: encodes the payload for the chosen
+     * format, applies QoS, retain and the MQTT 5 properties, then sends it. Runs on
+     * the worker thread.
+     */
     private void publish() {
         runAsync("publish", () -> {
             PlccomMqttClient current = requireConnectedClient();
-            MqttClientPublishBuilder builder = current.publish(trim(publishTopicField), publishPayloadArea.getText());
+            String payloadFormat = (String) publishFormatCombo.getSelectedItem();
+            byte[] payload = encodePublishPayloadOrThrow(payloadFormat, publishPayloadArea.getText());
+            MqttClientPublishBuilder builder = current.publish(trim(publishTopicField), payload);
             applyQos(builder, publishQosCombo);
 
             // Retain stores the last value for a topic on the broker. Message
             // Expiry and the response/correlation fields are MQTT 5 metadata; MQTT
             // 3.1.1 brokers simply do not negotiate those features.
-            builder.retain(retainCheck.isSelected()).payloadFormatUtf8();
+            builder.retain(retainCheck.isSelected());
+            if (isTextPayloadFormat(payloadFormat)) {
+                // Plaintext and JSON are UTF-8 text; Base64/Hex carry raw bytes.
+                builder.payloadFormatUtf8();
+            }
             String contentType = trimOrNull(contentTypeField);
             if (contentType != null) {
                 builder.contentType(contentType);
@@ -980,24 +1173,161 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
-    private void publishJson() {
-        runAsync("publishJson", () -> {
-            PlccomMqttClient current = requireConnectedClient();
-            // The high-level API accepts normal Java maps for JSON payloads. This
-            // keeps workshop code focused on MQTT instead of manual JSON string
-            // escaping.
-            Map<String, Object> payload = new LinkedHashMap<String, Object>();
-            payload.put("source", "PLCcom MQTT Client Tool");
-            payload.put("text", publishPayloadArea.getText());
-            payload.put("time", System.currentTimeMillis());
-            MqttClientPublishBuilder builder = current.publishJson(trim(publishTopicField), payload);
-            applyQos(builder, publishQosCombo);
-            builder.retain(retainCheck.isSelected());
-            MqttPublishResult result = requireGood(builder.send());
-            logSuccess("log.publishedJson", result.getTopic(), result.getQualityOfService());
-        });
+    /**
+     * Encodes the payload for the chosen format, translating any decoding error into
+     * a {@link PlccomMqttException} with a readable message for the log.
+     */
+    private byte[] encodePublishPayloadOrThrow(String payloadFormat, String text)
+            throws PlccomMqttException {
+        try {
+            return encodePublishPayload(payloadFormat, text);
+        } catch (RuntimeException ex) {
+            throw new PlccomMqttException(format("error.payload.format", payloadFormat), ex);
+        }
     }
 
+    /**
+     * Reacts to a change of the payload-format selector by converting the visible
+     * text into the newly chosen format, so the editor always shows exactly the
+     * bytes that will be published.
+     */
+    private void onPublishFormatChanged() {
+        String newFormat = (String) publishFormatCombo.getSelectedItem();
+        if (newFormat == null || newFormat.equals(currentPayloadFormat)) {
+            return;
+        }
+        // Convert the visible payload into the newly selected format, so the editor
+        // always shows exactly what will be sent. The current text is decoded to raw
+        // bytes using the previous format, then re-rendered in the new format.
+        String text = publishPayloadArea.getText();
+        if (text.trim().isEmpty()) {
+            publishPayloadArea.setText(
+                    PAYLOAD_FORMAT_JSON.equals(newFormat) ? PAYLOAD_JSON_TEMPLATE : "");
+        } else {
+            byte[] bytes = decodePayloadBytesLenient(currentPayloadFormat, text);
+            publishPayloadArea.setText(encodePayloadText(newFormat, bytes));
+        }
+        currentPayloadFormat = newFormat;
+    }
+
+    /**
+     * Decodes editor text into raw bytes using the given format, never throwing:
+     * invalid Base64/Hex falls back to the UTF-8 bytes of the raw text so switching
+     * formats can never lose what the user typed. Used only for the on-screen
+     * conversion; the actual publish uses the strict {@link #encodePublishPayload}.
+     */
+    private static byte[] decodePayloadBytesLenient(String format, String text) {
+        try {
+            if (PAYLOAD_FORMAT_BASE64.equals(format)) {
+                return Base64.getDecoder().decode(collapseWhitespace(text));
+            }
+            if (PAYLOAD_FORMAT_HEX.equals(format)) {
+                return decodeHex(text);
+            }
+        } catch (RuntimeException ex) {
+            // Malformed Base64/Hex: keep the raw text so nothing is lost.
+        }
+        return text.getBytes(StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Renders raw bytes as editor text in the given format. JSON keeps an existing
+     * JSON object/array unchanged and otherwise wraps the text into a small
+     * {@code {"msg": ...}} object. Package-private for {@code ClientToolPayloadFormatTest}.
+     */
+    static String encodePayloadText(String format, byte[] bytes) {
+        if (PAYLOAD_FORMAT_BASE64.equals(format)) {
+            return Base64.getEncoder().encodeToString(bytes);
+        }
+        if (PAYLOAD_FORMAT_HEX.equals(format)) {
+            return toHex(bytes);
+        }
+        if (PAYLOAD_FORMAT_JSON.equals(format)) {
+            String text = new String(bytes, StandardCharsets.UTF_8);
+            if (looksLikeJsonDocument(text)) {
+                return text;
+            }
+            JsonObject wrapper = new JsonObject();
+            wrapper.addProperty("msg", text);
+            return new GsonBuilder().setPrettyPrinting().create().toJson(wrapper);
+        }
+        return new String(bytes, StandardCharsets.UTF_8); // Plaintext
+    }
+
+    /** Quick check whether the text is a JSON object or array, so JSON stays verbatim. */
+    private static boolean looksLikeJsonDocument(String text) {
+        String trimmed = text.trim();
+        if (trimmed.isEmpty() || !(trimmed.charAt(0) == '{' || trimmed.charAt(0) == '[')) {
+            return false;
+        }
+        try {
+            JsonElement element = JsonParser.parseString(trimmed);
+            return element.isJsonObject() || element.isJsonArray();
+        } catch (RuntimeException ex) {
+            return false;
+        }
+    }
+
+    /** Uppercase hex string, two digits per byte, with no separators. */
+    private static String toHex(byte[] bytes) {
+        StringBuilder hex = new StringBuilder(bytes.length * 2);
+        for (byte value : bytes) {
+            hex.append(Character.forDigit((value >> 4) & 0xF, 16));
+            hex.append(Character.forDigit(value & 0xF, 16));
+        }
+        return hex.toString().toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * Converts the payload editor text into the bytes to publish, according to the
+     * selected payload format. Plaintext and JSON are sent verbatim as UTF-8 (JSON is
+     * validated first); Base64 and Hex are decoded into raw bytes. Package-private for
+     * {@code ClientToolPayloadFormatTest}.
+     */
+    static byte[] encodePublishPayload(String payloadFormat, String text) {
+        if (PAYLOAD_FORMAT_BASE64.equals(payloadFormat)) {
+            return Base64.getDecoder().decode(collapseWhitespace(text));
+        }
+        if (PAYLOAD_FORMAT_HEX.equals(payloadFormat)) {
+            return decodeHex(text);
+        }
+        if (PAYLOAD_FORMAT_JSON.equals(payloadFormat)) {
+            JsonParser.parseString(text); // throws if the text is not well-formed JSON
+            return text.getBytes(StandardCharsets.UTF_8);
+        }
+        return text.getBytes(StandardCharsets.UTF_8); // Plaintext
+    }
+
+    /** True for the UTF-8 text formats (Plaintext, JSON), false for Base64/Hex. */
+    static boolean isTextPayloadFormat(String payloadFormat) {
+        return PAYLOAD_FORMAT_PLAINTEXT.equals(payloadFormat)
+                || PAYLOAD_FORMAT_JSON.equals(payloadFormat);
+    }
+
+    /** Removes all whitespace so Base64/Hex pasted with line breaks still decodes. */
+    private static String collapseWhitespace(String text) {
+        return text == null ? "" : text.replaceAll("\\s", "");
+    }
+
+    /** Parses a hex string into bytes, rejecting odd length or non-hex characters. */
+    private static byte[] decodeHex(String text) {
+        String hex = collapseWhitespace(text);
+        if ((hex.length() & 1) == 1) {
+            throw new IllegalArgumentException("Hex payload must have an even number of digits");
+        }
+        byte[] bytes = new byte[hex.length() / 2];
+        for (int i = 0; i < bytes.length; i++) {
+            int high = Character.digit(hex.charAt(i * 2), 16);
+            int low = Character.digit(hex.charAt(i * 2 + 1), 16);
+            if (high < 0 || low < 0) {
+                throw new IllegalArgumentException("Hex payload contains a non-hex character");
+            }
+            bytes[i] = (byte) ((high << 4) | low);
+        }
+        return bytes;
+    }
+
+    /** Clears the retained message on the publish topic via an empty retained publish. */
     private void deleteRetained() {
         runAsync("deleteRetained", () -> {
             PlccomMqttClient current = requireConnectedClient();
@@ -1011,6 +1341,10 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /**
+     * Runs an MQTT 5 request/response round-trip from the Request tab and shows the
+     * reply in the log and the Messages tab.
+     */
     private void sendRequest() {
         runAsync("request", () -> {
             PlccomMqttClient current = requireConnectedClient();
@@ -1035,6 +1369,10 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /**
+     * Subscribes to the topic filter from the Subscribe tab with the chosen QoS and
+     * MQTT 5 options, and remembers the subscription so it can be undone later.
+     */
     private void subscribe() {
         runAsync("subscribe", () -> {
             PlccomMqttClient current = requireConnectedClient();
@@ -1068,6 +1406,10 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /**
+     * Waits once (up to the configured timeout) for the next message on the active
+     * subscriptions, without installing a permanent callback.
+     */
     private void receiveOnce() {
         runAsync("receiveOnce", () -> {
             PlccomMqttClient current = requireConnectedClient();
@@ -1080,6 +1422,7 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /** Unsubscribes from every active subscription created on the Subscribe tab. */
     private void unsubscribeAll() {
         runAsync("unsubscribeAll", () -> {
             List<MqttSubscribeResult> copy;
@@ -1096,6 +1439,7 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /** Returns the live client, or throws with a readable message if not connected. */
     private PlccomMqttClient requireConnectedClient() throws PlccomMqttException {
         PlccomMqttClient current = client;
         if (current == null || !current.isConnected()) {
@@ -1104,6 +1448,10 @@ public final class PlccomMqttClientToolApp {
         return current;
     }
 
+    /**
+     * Returns the result when the operation succeeded, otherwise throws a
+     * {@link PlccomMqttException} built from its quality and localized message.
+     */
     private <T extends OperationResult> T requireGood(T result) throws PlccomMqttException {
         if (result == null) {
             throw new PlccomMqttException("MQTT operation returned no result");
@@ -1120,6 +1468,10 @@ public final class PlccomMqttClientToolApp {
         throw new PlccomMqttException(message.toString(), result.getInnerException());
     }
 
+    /**
+     * Cleans up the current client without surfacing errors: undoes subscriptions,
+     * disconnects if needed and closes it. Used on reconnect, disconnect and shutdown.
+     */
     private void closeClientQuietly() {
         unsubscribeAllQuietly();
         PlccomMqttClient current = client;
@@ -1137,6 +1489,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Best-effort unsubscribe of all tracked subscriptions, logging any failure only. */
     private void unsubscribeAllQuietly() {
         List<MqttSubscribeResult> copy;
         synchronized (subscriptions) {
@@ -1154,6 +1507,10 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Releases everything on window close: stops the auto-save timer, persists the
+     * settings once, closes the client and shuts the worker thread down.
+     */
     private void shutdown() {
         if (settingsAutoSaveTimer != null) {
             settingsAutoSaveTimer.stop();
@@ -1166,6 +1523,7 @@ public final class PlccomMqttClientToolApp {
         executor.shutdownNow();
     }
 
+    /** Restores language, theme and all field values from the per-user settings file. */
     private void loadSettings() {
         if (!settingsPersistenceEnabled) {
             return;
@@ -1198,6 +1556,7 @@ public final class PlccomMqttClientToolApp {
         loadToolSettings(settings);
     }
 
+    /** Persists language, theme and all field values to the per-user settings file. */
     private void saveSettings() {
         Properties settings = new Properties();
         settings.setProperty("ui.language", locale.getLanguage());
@@ -1218,6 +1577,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Applies every saved field value from the given settings back into the UI widgets. */
     private void loadToolSettings(Properties settings) {
         setProtectedText(settings, "license.user", licenseUserField);
         setProtectedText(settings, "license.serial", licenseSerialField);
@@ -1234,7 +1594,14 @@ public final class PlccomMqttClientToolApp {
         setSpinner(settings, "connection.connectTimeout", connectTimeoutSpinner);
         setSpinner(settings, "connection.operationTimeout", operationTimeoutSpinner);
         setCombo(settings, "connection.diagnosticLevel", diagnosticLevelCombo);
-        setSpinner(settings, "connection.diagnosticThrottle", diagnosticThrottleSpinner);
+        String maxLinesValue = settings.getProperty("log.maxLines");
+        if (maxLinesValue != null && logPanel != null) {
+            try {
+                logPanel.setMaxLines(Integer.parseInt(maxLinesValue.trim()));
+            } catch (NumberFormatException ignored) {
+                // Keep the default maximum on an obsolete or edited value.
+            }
+        }
         setProtectedText(settings, "connection.clientCertificatePassword", clientCertificatePasswordField);
         setCheck(settings, "connection.lastWill", lastWillCheck);
         setText(settings, "connection.lastWillTopic", lastWillTopicField);
@@ -1250,6 +1617,7 @@ public final class PlccomMqttClientToolApp {
         setText(settings, "publish.topic", publishTopicField);
         setText(settings, "publish.payload", publishPayloadArea);
         setCombo(settings, "publish.qos", publishQosCombo);
+        setCombo(settings, "publish.format", publishFormatCombo);
         setCheck(settings, "publish.retain", retainCheck);
         setText(settings, "publish.contentType", contentTypeField);
         setSpinner(settings, "publish.expiry", messageExpirySpinner);
@@ -1274,6 +1642,7 @@ public final class PlccomMqttClientToolApp {
         setSpinner(settings, "subscribe.receiveTimeout", receiveTimeoutSpinner);
     }
 
+    /** Writes every field value into the given settings; sensitive fields are encrypted. */
     private void saveToolSettings(Properties settings) {
         putProtectedText(settings, "license.user", licenseUserField);
         putProtectedText(settings, "license.serial", licenseSerialField);
@@ -1290,7 +1659,9 @@ public final class PlccomMqttClientToolApp {
         putSpinner(settings, "connection.connectTimeout", connectTimeoutSpinner);
         putSpinner(settings, "connection.operationTimeout", operationTimeoutSpinner);
         putCombo(settings, "connection.diagnosticLevel", diagnosticLevelCombo);
-        putSpinner(settings, "connection.diagnosticThrottle", diagnosticThrottleSpinner);
+        if (logPanel != null) {
+            settings.setProperty("log.maxLines", String.valueOf(logPanel.getMaxLines()));
+        }
         putProtectedText(settings, "connection.clientCertificatePassword", clientCertificatePasswordField);
         putCheck(settings, "connection.lastWill", lastWillCheck);
         putText(settings, "connection.lastWillTopic", lastWillTopicField);
@@ -1304,6 +1675,7 @@ public final class PlccomMqttClientToolApp {
         putText(settings, "publish.topic", publishTopicField);
         putText(settings, "publish.payload", publishPayloadArea);
         putCombo(settings, "publish.qos", publishQosCombo);
+        putCombo(settings, "publish.format", publishFormatCombo);
         putCheck(settings, "publish.retain", retainCheck);
         putText(settings, "publish.contentType", contentTypeField);
         putSpinner(settings, "publish.expiry", messageExpirySpinner);
@@ -1328,6 +1700,11 @@ public final class PlccomMqttClientToolApp {
         putSpinner(settings, "subscribe.receiveTimeout", receiveTimeoutSpinner);
     }
 
+    /**
+     * Runs a button action on the background worker thread, guarding against
+     * overlapping operations and funnelling every failure into the log while keeping
+     * the window responsive. Also drives the status pill (busy/ready/connected/error).
+     */
     private void runAsync(String operation, ThrowingRunnable task) {
         if (!operationActive.compareAndSet(false, true)) {
             logWarning("log.operation.busy");
@@ -1358,7 +1735,18 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /** Pushes the currently selected diagnostic level to the live client, if any. */
+    private void applyRuntimeDiagnosticLevel() {
+        // The selected level drives both consumers: the tool's own log filter
+        // (always, even without a connection) and the live SDK client.
+        uiLogLevel = selectedDiagnosticLevel(diagnosticLevelCombo);
+        PlccomMqttClient current = client;
+        if (current != null) {
+            current.setDiagnosticLevel(uiLogLevel);
+        }
+    }
 
+    /** Maps the diagnostic-level combo selection to a {@link PlccomMqttDiagnosticLevel}. */
     private static PlccomMqttDiagnosticLevel selectedDiagnosticLevel(JComboBox<String> combo) {
         if (combo == null) {
             return PlccomMqttDiagnosticLevel.INFO;
@@ -1379,10 +1767,18 @@ public final class PlccomMqttClientToolApp {
                 return PlccomMqttDiagnosticLevel.INFO;
         }
     }
+
+    /**
+     * Configures TLS on the builder when the endpoint is secure: sets the PKI store
+     * and host-name validation, and adds the client certificate when mutual TLS is
+     * enabled. The certificate password is wiped from memory afterwards.
+     */
     private void applyClientTls(PlccomMqttClientBuilder builder) throws Exception {
-        if (!isSecureEndpoint(trim(endpointField))) {
+        String endpointText = trim(endpointField);
+        if (!isSecureEndpoint(endpointText)) {
             return;
         }
+        PlccomMqttEndpoint endpoint = PlccomMqttEndpoint.parse(endpointText);
         char[] password = clientCertificatePasswordField.getPassword();
         try {
             PlccomMqttPkiStore pkiStore = createPkiStore();
@@ -1390,6 +1786,8 @@ public final class PlccomMqttClientToolApp {
                     .enabledProtocols("TLSv1.3", "TLSv1.2")
                     .pkiOptions(PlccomMqttPkiOptions.builder()
                             .pkiStore(pkiStore)
+                            .validateRemoteCertificateHostName(true)
+                            .targetHostName(endpoint.getHost())
                             .build());
             if (clientCertificateCheck.isSelected()) {
                 String pkiOwnAlias = trimOrNull(clientPkiOwnAliasField);
@@ -1414,7 +1812,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
-
+    /** Human-readable list of keystore aliases (with key/certificate tag) for the log. */
     private String describeKeyStoreAliases(KeyStore keyStore) {
         try {
             StringBuilder builder = new StringBuilder();
@@ -1433,6 +1831,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Copies the bundled help website to a per-user folder and opens it in the browser. */
     private void openHelp() {
         try {
             File index = prepareHelpWebsite();
@@ -1443,6 +1842,12 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Installs the debounced auto-save: a short one-shot timer writes the settings a
+     * moment after the last change, and every editable field is wired to restart it.
+     * The payload-format listener is attached last so restoring a saved format does
+     * not convert the just-loaded payload.
+     */
     private void installSettingsAutoSave() {
         if (settingsAutoSaveInstalled) {
             return;
@@ -1463,16 +1868,22 @@ public final class PlccomMqttClientToolApp {
                 userPropertyValueField, requestTopicField, requestResponseTopicField,
                 requestPayloadArea, subscribeTopicField, sharedGroupField);
         bindComboAutoSave(protocolCombo, diagnosticLevelCombo, lastWillQosCombo, publishQosCombo,
-                subscribeQosCombo, retainHandlingCombo);
+                publishFormatCombo, subscribeQosCombo, retainHandlingCombo);
+        // Sync the tracked payload format with the loaded value, then attach the
+        // conversion listener after settings load, so restoring a saved format does
+        // not convert (or overwrite) the saved payload.
+        currentPayloadFormat = (String) publishFormatCombo.getSelectedItem();
+        publishFormatCombo.addActionListener(event -> onPublishFormatChanged());
         bindButtonAutoSave(cleanStartCheck, reconnectCheck, clientCertificateCheck,
                 lastWillCheck, lastWillRetainCheck, retainCheck, sharedSubscriptionCheck,
                 noLocalCheck, retainAsPublishedCheck, subscriptionIdentifierCheck);
         bindSpinnerAutoSave(keepAliveSpinner, topicAliasSpinner, connectTimeoutSpinner,
-                operationTimeoutSpinner, diagnosticThrottleSpinner, lastWillDelaySpinner,
+                operationTimeoutSpinner, lastWillDelaySpinner,
                 lastWillExpirySpinner, messageExpirySpinner, subscriptionIdentifierSpinner,
                 receiveTimeoutSpinner);
     }
 
+    /** Restarts the auto-save timer whenever any of the given text components change. */
     private void bindTextAutoSave(JTextComponent... components) {
         DocumentListener listener = new DocumentListener() {
             @Override
@@ -1497,6 +1908,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Restarts the auto-save timer whenever any of the given combo boxes change. */
     private void bindComboAutoSave(JComboBox<?>... components) {
         for (JComboBox<?> component : components) {
             if (component != null) {
@@ -1505,6 +1917,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Restarts the auto-save timer whenever any of the given checkboxes toggle. */
     private void bindButtonAutoSave(AbstractButton... components) {
         for (AbstractButton component : components) {
             if (component != null) {
@@ -1513,6 +1926,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Restarts the auto-save timer whenever any of the given spinners change. */
     private void bindSpinnerAutoSave(JSpinner... components) {
         for (JSpinner component : components) {
             if (component != null) {
@@ -1521,6 +1935,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** (Re)starts the debounce timer so a burst of edits is saved once, shortly after. */
     private void scheduleSettingsAutoSave() {
         if (!settingsPersistenceEnabled || !settingsAutoSaveInstalled || settingsAutoSaveTimer == null) {
             return;
@@ -1528,6 +1943,10 @@ public final class PlccomMqttClientToolApp {
         settingsAutoSaveTimer.restart();
     }
 
+    /**
+     * Extracts the localized help page and stylesheet from the jar into a per-version
+     * folder under the user profile and returns the index file to open.
+     */
     private File prepareHelpWebsite() throws IOException {
         String language = Locale.GERMAN.getLanguage().equals(locale.getLanguage()) ? "de" : "en";
         File targetDirectory = new File(new File(new File(settingsDirectory(), "Help"), "Client"), version());
@@ -1542,6 +1961,7 @@ public final class PlccomMqttClientToolApp {
         return index;
     }
 
+    /** Copies a classpath resource to a file, failing loudly if the resource is missing. */
     private void copyHelpResource(String resourceName, File target) throws IOException {
         try (InputStream input = PlccomMqttClientToolApp.class.getResourceAsStream(resourceName)) {
             if (input == null) {
@@ -1557,6 +1977,44 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Builds the clickable download-page link shown in the license bar. Its text
+     * is the localized URL (from {@code license.downloadUrl}), it is underlined
+     * and coloured like a hyperlink, and clicking it opens the page in the
+     * default browser.
+     */
+    private JLabel createDownloadLink() {
+        JLabel link = label("license.downloadUrl");
+        link.setName("licenseLink");
+        java.util.Map<java.awt.font.TextAttribute, Object> attributes =
+                new java.util.HashMap<java.awt.font.TextAttribute, Object>(link.getFont().getAttributes());
+        attributes.put(java.awt.font.TextAttribute.UNDERLINE, java.awt.font.TextAttribute.UNDERLINE_ON);
+        link.setFont(link.getFont().deriveFont(attributes));
+        link.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        link.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent event) {
+                browseUrl(t("license.downloadUrl"));
+            }
+        });
+        return link;
+    }
+
+    /** Opens a URL in the default browser, falling back to printing it in the log. */
+    private void browseUrl(String url) {
+        try {
+            if (Desktop.isDesktopSupported()
+                    && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+                Desktop.getDesktop().browse(new java.net.URI(url));
+                return;
+            }
+        } catch (Exception ex) {
+            // Fall through: show the URL in the (selectable) log so it can be copied.
+        }
+        logInfoText(url);
+    }
+
+    /** Opens a local file in the browser, falling back to an OS-specific launcher. */
     private void openInBrowser(File file) throws IOException {
         if (Desktop.isDesktopSupported()) {
             Desktop desktop = Desktop.getDesktop();
@@ -1572,6 +2030,7 @@ public final class PlccomMqttClientToolApp {
         openInBrowserFallback(file);
     }
 
+    /** Last-resort browser launch via the platform's file/URL handler. */
     private static void openInBrowserFallback(File file) throws IOException {
         String uri = file.toURI().toString();
         String osName = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
@@ -1583,6 +2042,8 @@ public final class PlccomMqttClientToolApp {
             Runtime.getRuntime().exec(new String[] { "xdg-open", uri });
         }
     }
+
+    /** Opens the shared PLCcom certificate manager for this tool's per-user PKI store. */
     private void showCertificateManager() {
         char[] password = clientCertificatePasswordField == null
                 ? new char[0]
@@ -1599,6 +2060,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Creates the PKI folder structure on startup so TLS has somewhere to store keys. */
     private void ensureConfiguredPkiDirectories() {
         try {
             createPkiStore();
@@ -1607,6 +2069,10 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Creates the per-user PKI store and wires its event callback so a newly rejected
+     * remote certificate triggers the trust prompt.
+     */
     private PlccomMqttPkiStore createPkiStore() throws IOException {
         final PlccomMqttPkiStore[] storeRef = new PlccomMqttPkiStore[1];
         PlccomMqttPkiStore pkiStore = new PlccomMqttPkiStore(Paths.get(DEFAULT_PKI_FOLDER),
@@ -1616,6 +2082,11 @@ public final class PlccomMqttClientToolApp {
         return pkiStore;
     }
 
+    /**
+     * Reacts to PKI store events: when a remote certificate is stored as rejected,
+     * prompts the user once per fingerprint to trust it. A freshly written rejected
+     * file is treated as a new onboarding attempt even within the same run.
+     */
     private void handlePkiStoreEvent(PlccomMqttPkiStore pkiStore,
             PlccomMqttPkiStoreEvent event) {
         if (pkiStore == null || event == null
@@ -1634,11 +2105,18 @@ public final class PlccomMqttClientToolApp {
         SwingUtilities.invokeLater(() -> showRejectedCertificateDialog(pkiStore, event, fingerprint));
     }
 
+    /**
+     * Shows the details of an untrusted remote certificate and, on confirmation,
+     * moves it from the rejected to the trusted store.
+     */
     private void showRejectedCertificateDialog(PlccomMqttPkiStore pkiStore,
             PlccomMqttPkiStoreEvent event, String fingerprint) {
         X509Certificate certificate = event.getCertificate();
         logWarning("log.pki.rejected", fingerprint, event.getPath());
 
+        // Show the full certificate identity (subject, issuer, serial, validity,
+        // fingerprint, file) as a read-only, word-wrapped text block so the user can
+        // decide whether to trust it.
         JTextArea details = new JTextArea(format("dialog.certificate.message",
                 certificate.getSubjectX500Principal().getName(),
                 certificate.getIssuerX500Principal().getName(),
@@ -1654,6 +2132,8 @@ public final class PlccomMqttClientToolApp {
         details.setRows(13);
         theme(details);
 
+        // Two explicit choices: trust the certificate, or keep it rejected. The
+        // warning icon signals that trusting is a security decision.
         Object[] options = {
                 t("dialog.certificate.trust"),
                 t("dialog.certificate.keepRejected")
@@ -1662,9 +2142,12 @@ public final class PlccomMqttClientToolApp {
                 t("dialog.certificate.title"), JOptionPane.YES_NO_OPTION,
                 JOptionPane.WARNING_MESSAGE, null, options, options[0]);
         if (choice != JOptionPane.YES_OPTION) {
+            // Kept rejected: just note it in the log; the next connect will prompt again.
             logWarning("log.pki.rejectedKept", fingerprint, event.getPath());
             return;
         }
+        // Trusted: move the file from the rejected to the trusted store and tell the
+        // user to retry the connection. Any failure to move it is reported too.
         try {
             logSuccess("log.pki.trusted",
                     fingerprint,
@@ -1682,7 +2165,14 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Opens the endpoint assistant: a small dialog that composes a valid broker URL
+     * from transport, host, port and (for WebSocket) path, and writes it back into
+     * the endpoint field once it validates.
+     */
     private void showEndpointAssistant() {
+        // Pre-fill the four editors from whatever is currently in the endpoint field,
+        // so the assistant opens on the user's existing value instead of a blank form.
         EndpointParts initial = parseEndpointParts(trim(endpointField));
         JComboBox<String> transportCombo = combo(ENDPOINT_TRANSPORT_TCP, ENDPOINT_TRANSPORT_TLS,
                 ENDPOINT_TRANSPORT_WS, ENDPOINT_TRANSPORT_WSS);
@@ -1691,8 +2181,13 @@ public final class PlccomMqttClientToolApp {
         JTextField pathField = textField(22, initial.path);
 
         transportCombo.setSelectedItem(initial.transport);
+        // The path field only makes sense for WebSocket transports; keep it enabled
+        // only for those.
         Runnable refreshPathState = () -> pathField.setEnabled(isWebSocketTransport(transportCombo.getSelectedItem()));
         transportCombo.addActionListener(e -> {
+            // When the user switches transport and the port is still one of the well
+            // known defaults, follow it to the new transport's default port. A custom
+            // port is left untouched so we never overwrite a deliberate choice.
             int currentPort = number(portSpinner);
             if (currentPort == 1883 || currentPort == 8883 || currentPort == 8080 || currentPort == 8443) {
                 portSpinner.setValue(Integer.valueOf(defaultEndpointPort(transportCombo.getSelectedItem())));
@@ -1701,6 +2196,7 @@ public final class PlccomMqttClientToolApp {
         });
         refreshPathState.run();
 
+        // Lay out the four rows (transport, host, port, path) in a simple grid.
         JPanel content = new JPanel(new GridBagLayout());
         content.setBorder(new EmptyBorder(8, 8, 8, 8));
         GridBagConstraints gbc = new GridBagConstraints();
@@ -1711,13 +2207,17 @@ public final class PlccomMqttClientToolApp {
         addEndpointAssistantRow(content, gbc, "dialog.endpoint.path", pathField);
         theme(content);
 
+        // Loop so an invalid combination keeps the dialog open with the user's input,
+        // instead of discarding it. Cancel (or the window close) leaves the field as is.
         Object[] options = { t("dialog.endpoint.apply"), t("dialog.endpoint.cancel") };
         while (true) {
             int result = JOptionPane.showOptionDialog(frame, content, t("dialog.endpoint.title"),
                     JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
             if (result != 0) {
-                return;
+                return; // anything other than "Apply" (index 0) cancels
             }
+            // Compose the URL from the four parts and validate it. On success write
+            // it back to the endpoint field and close; on failure warn and loop.
             String endpoint = buildEndpointFromParts(transportCombo.getSelectedItem(),
                     trim(hostField), number(portSpinner), trim(pathField));
             try {
@@ -1731,6 +2231,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Adds one label + field row to the endpoint assistant's grid. */
     private void addEndpointAssistantRow(JPanel panel, GridBagConstraints gbc, String key, JComponent field) {
         gbc.gridx = 0;
         gbc.weightx = 0;
@@ -1748,12 +2249,14 @@ public final class PlccomMqttClientToolApp {
         gbc.gridy++;
     }
 
+    /** Returns the validated endpoint from the field, throwing if it is malformed. */
     private String endpointForConnect() throws PlccomMqttException {
         String endpoint = trim(endpointField);
         validateEndpoint(endpoint);
         return endpoint;
     }
 
+    /** Composes a broker URL from the assistant's transport, host, port and path. */
     private String buildEndpointFromParts(Object transport, String host, int port, String path) {
         String scheme = endpointScheme(transport);
         StringBuilder builder = new StringBuilder();
@@ -1764,6 +2267,11 @@ public final class PlccomMqttClientToolApp {
         return builder.toString();
     }
 
+    /**
+     * Validates a broker endpoint URL: a known scheme, no embedded credentials, a
+     * host and a 1..65535 port, no query/fragment, and a path only for WebSocket
+     * schemes. Throws a localized {@link PlccomMqttException} for the first problem.
+     */
     private void validateEndpoint(String endpoint) throws PlccomMqttException {
         if (endpoint == null || endpoint.trim().length() == 0) {
             throw new PlccomMqttException(t("error.endpoint.required"));
@@ -1778,13 +2286,18 @@ public final class PlccomMqttClientToolApp {
         if (!isSupportedEndpointScheme(scheme)) {
             throw new PlccomMqttException(format("error.endpoint.scheme", "mqtt, mqtts, ws, wss"));
         }
-        if (uri.getUserInfo() != null && uri.getUserInfo().length() > 0) {
+        String rawAuthority = uri.getRawAuthority();
+        boolean hasUserInfo = (uri.getUserInfo() != null && uri.getUserInfo().length() > 0)
+                || (rawAuthority != null && rawAuthority.indexOf('@') >= 0);
+        if (hasUserInfo) {
             throw new PlccomMqttException(t("error.endpoint.userInfo"));
         }
-        if (uri.getHost() == null || uri.getHost().trim().length() == 0) {
+        String host = endpointHost(uri);
+        if (host == null || host.trim().length() == 0) {
             throw new PlccomMqttException(t("error.endpoint.host"));
         }
-        if (uri.getPort() < 1 || uri.getPort() > 65535) {
+        int port = endpointPort(uri);
+        if (port < 1 || port > 65535) {
             throw new PlccomMqttException(t("error.endpoint.port"));
         }
         if (uri.getRawQuery() != null || uri.getRawFragment() != null) {
@@ -1800,6 +2313,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Splits an endpoint URL back into assistant parts, falling back to sane defaults. */
     private EndpointParts parseEndpointParts(String endpoint) {
         EndpointParts defaults = new EndpointParts(ENDPOINT_TRANSPORT_TCP, "127.0.0.1", 1883, "/mqtt");
         if (endpoint == null || endpoint.trim().length() == 0) {
@@ -1807,19 +2321,22 @@ public final class PlccomMqttClientToolApp {
         }
         try {
             URI uri = new URI(endpoint.trim());
-            if (!isSupportedEndpointScheme(uri.getScheme()) || uri.getHost() == null) {
+            String host = endpointHost(uri);
+            if (!isSupportedEndpointScheme(uri.getScheme()) || host == null) {
                 return defaults;
             }
             String transport = endpointTransport(uri.getScheme());
-            int port = uri.getPort() > 0 ? uri.getPort() : defaultEndpointPort(transport);
+            int uriPort = endpointPort(uri);
+            int port = uriPort > 0 ? uriPort : defaultEndpointPort(transport);
             String path = uri.getPath();
-            return new EndpointParts(transport, uri.getHost(), port,
+            return new EndpointParts(transport, host, port,
                     path == null || path.length() == 0 ? "/mqtt" : path);
         } catch (RuntimeException | URISyntaxException ex) {
             return defaults;
         }
     }
 
+    /** True for the four accepted schemes: mqtt, mqtts, ws, wss. */
     private static boolean isSupportedEndpointScheme(String scheme) {
         return "mqtt".equalsIgnoreCase(scheme)
                 || "mqtts".equalsIgnoreCase(scheme)
@@ -1827,6 +2344,66 @@ public final class PlccomMqttClientToolApp {
                 || "wss".equalsIgnoreCase(scheme);
     }
 
+    // java.net.URI.getHost()/getPort() return null/-1 for host names that are not
+    // strictly RFC 2396 compliant, most notably Windows/NetBIOS names containing
+    // an underscore (for example MY_BROKER_HOST). These helpers recover the host
+    // and port from the raw authority so the tool accepts such endpoints, matching
+    // the underscore-tolerant parsing in the client library (PlccomMqttEndpoint).
+    // Package-private so ClientToolEndpointTest can verify the recovery directly.
+    static String endpointHost(URI uri) {
+        String host = uri.getHost();
+        if (host != null) {
+            return host;
+        }
+        String authority = authorityWithoutUserInfo(uri);
+        if (authority == null) {
+            return null;
+        }
+        if (authority.startsWith("[")) {
+            int close = authority.indexOf(']');
+            return close > 0 ? authority.substring(0, close + 1) : null;
+        }
+        int colon = authority.lastIndexOf(':');
+        String hostPart = colon >= 0 ? authority.substring(0, colon) : authority;
+        return hostPart.length() == 0 ? null : hostPart;
+    }
+
+    static int endpointPort(URI uri) {
+        int port = uri.getPort();
+        if (port >= 0) {
+            return port;
+        }
+        String authority = authorityWithoutUserInfo(uri);
+        if (authority == null) {
+            return -1;
+        }
+        int colon;
+        if (authority.startsWith("[")) {
+            int close = authority.indexOf(']');
+            colon = close < 0 ? -1 : authority.indexOf(':', close);
+        } else {
+            colon = authority.lastIndexOf(':');
+        }
+        if (colon < 0 || colon + 1 >= authority.length()) {
+            return -1;
+        }
+        try {
+            return Integer.parseInt(authority.substring(colon + 1));
+        } catch (NumberFormatException ex) {
+            return -1;
+        }
+    }
+
+    static String authorityWithoutUserInfo(URI uri) {
+        String authority = uri.getRawAuthority();
+        if (authority == null) {
+            return null;
+        }
+        int at = authority.indexOf('@');
+        return at >= 0 ? authority.substring(at + 1) : authority;
+    }
+
+    /** URI scheme for an assistant transport (mqtt/mqtts/ws/wss). */
     private static String endpointScheme(Object transport) {
         if (ENDPOINT_TRANSPORT_TLS.equals(transport)) {
             return "mqtts";
@@ -1840,6 +2417,7 @@ public final class PlccomMqttClientToolApp {
         return "mqtt";
     }
 
+    /** Inverse of {@link #endpointScheme}: the transport label for a URI scheme. */
     private static String endpointTransport(String scheme) {
         if ("mqtts".equalsIgnoreCase(scheme)) {
             return ENDPOINT_TRANSPORT_TLS;
@@ -1853,6 +2431,7 @@ public final class PlccomMqttClientToolApp {
         return ENDPOINT_TRANSPORT_TCP;
     }
 
+    /** Conventional default port per transport (1883/8883/8080/8443). */
     private static int defaultEndpointPort(Object transport) {
         if (ENDPOINT_TRANSPORT_TLS.equals(transport)) {
             return 8883;
@@ -1866,10 +2445,12 @@ public final class PlccomMqttClientToolApp {
         return 1883;
     }
 
+    /** True for the WebSocket transports (WS/WSS), which alone carry a path. */
     private static boolean isWebSocketTransport(Object transport) {
         return ENDPOINT_TRANSPORT_WS.equals(transport) || ENDPOINT_TRANSPORT_WSS.equals(transport);
     }
 
+    /** Ensures a WebSocket path is non-empty and starts with a slash. */
     private static String normalizedWebSocketPath(String path) {
         if (path == null || path.trim().length() == 0) {
             return "/mqtt";
@@ -1878,6 +2459,7 @@ public final class PlccomMqttClientToolApp {
         return value.startsWith("/") ? value : "/" + value;
     }
 
+    /** Wraps a bare IPv6 address in [brackets] so it is valid in a URI authority. */
     private static String hostForUri(String host) {
         if (host == null) {
             return "";
@@ -1889,6 +2471,7 @@ public final class PlccomMqttClientToolApp {
         return value;
     }
 
+    /** SHA-1 thumbprint of a certificate, or "unknown" if it cannot be computed. */
     private static String certificateFingerprint(X509Certificate certificate) {
         try {
             return PlccomMqttPkiStore.sha1Thumbprint(certificate);
@@ -1897,11 +2480,13 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** True when the endpoint uses a TLS transport (mqtts:// or wss://). */
     private static boolean isSecureEndpoint(String endpoint) {
         String lower = endpoint.toLowerCase(Locale.ROOT);
         return lower.startsWith("mqtts://") || lower.startsWith("wss://");
     }
 
+    /** Selects the MQTT protocol version on the builder from the protocol combo. */
     private void applyProtocol(PlccomMqttClientBuilder builder) {
         int index = protocolCombo.getSelectedIndex();
         if (index == 1) {
@@ -1913,6 +2498,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Configures the Last Will on the builder from the Last Will fields, if enabled. */
     private void applyLastWill(PlccomMqttClientBuilder builder) throws PlccomMqttException {
         if (!lastWillCheck.isSelected()) {
             return;
@@ -1940,6 +2526,7 @@ public final class PlccomMqttClientToolApp {
         will.done();
     }
 
+    /** Sets username/password on the builder and wipes the password bytes afterwards. */
     private void applyCredentials(PlccomMqttClientBuilder builder) {
         String user = trimOrNull(usernameField);
         char[] passwordChars = passwordField.getPassword();
@@ -1957,6 +2544,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Applies the selected QoS (0/1/2) to a publish builder. */
     private void applyQos(MqttClientPublishBuilder builder, JComboBox<String> combo) {
         int index = combo.getSelectedIndex();
         if (index == 1) {
@@ -1968,6 +2556,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Applies the selected QoS (0/1/2) to a Last Will builder. */
     private void applyQos(MqttClientWillBuilder builder, JComboBox<String> combo) {
         int index = combo.getSelectedIndex();
         if (index == 1) {
@@ -1979,6 +2568,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Applies the selected maximum QoS (0/1/2) to a subscribe builder. */
     private void applyQos(MqttClientSubscribeBuilder builder, JComboBox<String> combo) {
         int index = combo.getSelectedIndex();
         if (index == 1) {
@@ -1990,6 +2580,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Maps the retain-handling combo to the MQTT 5 retain-handling option. */
     private PlccomMqttRetainHandling retainHandling() {
         int index = retainHandlingCombo.getSelectedIndex();
         if (index == 1) {
@@ -2001,6 +2592,7 @@ public final class PlccomMqttClientToolApp {
         return PlccomMqttRetainHandling.SEND_AT_SUBSCRIBE;
     }
 
+    /** Adds a received message to the Messages table and the log, on the Swing thread. */
     private void messageReceived(MqttMessage message) {
         SwingUtilities.invokeLater(() -> {
             messageModel.addRow(new Object[] {
@@ -2017,10 +2609,30 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /**
+     * Diagnostic callback from the client: renders the event as a log line. The
+     * SDK dispatcher has already applied the selected diagnostic level, so the
+     * event goes straight to the panel - coloured by its real severity instead
+     * of a fixed warning colour.
+     */
     private void diagnostic(PlccomMqttDiagnosticEvent event) {
-        logPanel.append(LogLevel.WARNING, formatDiagnostic(event));
+        logPanel.append(diagnosticLogLevel(event), formatDiagnostic(event));
     }
 
+    /** Maps a diagnostic severity to the log panel colour level. */
+    private static LogLevel diagnosticLogLevel(PlccomMqttDiagnosticEvent event) {
+        switch (event.getSeverity()) {
+            case ERROR:
+            case FATAL:
+                return LogLevel.ERROR;
+            case WARNING:
+                return LogLevel.WARNING;
+            default:
+                return LogLevel.INFO;
+        }
+    }
+
+    /** Formats a diagnostic event into a single structured, filterable log line. */
     private String formatDiagnostic(PlccomMqttDiagnosticEvent event) {
         StringBuilder builder = new StringBuilder();
         // Diagnostics are structured log events. Severity/category/code are stable
@@ -2043,30 +2655,31 @@ public final class PlccomMqttClientToolApp {
         if (event.getClientId() != null) {
             builder.append(" clientId=").append(event.getClientId());
         }
-        if (event.getSuppressedCount() > 0) {
-            builder.append(" suppressed=").append(event.getSuppressedCount());
-        }
         if (event.getCause() != null) {
             builder.append(" cause=").append(shortCause(event.getCause()));
         }
         return builder.toString();
     }
 
+    /** Switches between the dark and light palettes and repaints. */
     private void toggleTheme() {
         palette = palette.dark ? Palette.light() : Palette.dark();
         applyTheme();
         scheduleSettingsAutoSave();
     }
 
+    /** Forces the light palette (used by the screenshot mode). */
     private void setLightTheme() {
         palette = Palette.light();
         applyTheme();
     }
 
+    /** Switches the UI language between German and English. */
     private void toggleLanguage() {
         setLanguage(Locale.GERMAN.getLanguage().equals(locale.getLanguage()) ? Locale.ENGLISH : Locale.GERMAN);
     }
 
+    /** Applies the given UI language, reloads the texts and re-translates the window. */
     private void setLanguage(Locale value) {
         locale = value;
         texts = ResourceBundle.getBundle(MESSAGE_BUNDLE, locale);
@@ -2074,10 +2687,12 @@ public final class PlccomMqttClientToolApp {
         scheduleSettingsAutoSave();
     }
 
+    /** Closes the window, which triggers the shutdown and settings-save handler. */
     private void exitApplication() {
         frame.dispose();
     }
 
+    /** Re-applies all texts for the current language across the whole window. */
     private void translate() {
         if (frame == null) {
             return;
@@ -2091,6 +2706,9 @@ public final class PlccomMqttClientToolApp {
         for (Map.Entry<AbstractButton, String> entry : buttonKeys.entrySet()) {
             entry.getKey().setText(t(entry.getValue()));
         }
+        // The theme button label depends on the current theme, not on a fixed
+        // resource key, so restore it after the generic button translation.
+        updateThemeButtonLabel();
         for (Map.Entry<JComponent, String> entry : tooltipKeys.entrySet()) {
             entry.getKey().setToolTipText(t(entry.getValue()));
         }
@@ -2104,6 +2722,7 @@ public final class PlccomMqttClientToolApp {
         frame.revalidate();
     }
 
+    /** Re-applies the current palette to every component and repaints the window. */
     private void applyTheme() {
         if (root == null) {
             return;
@@ -2113,7 +2732,7 @@ public final class PlccomMqttClientToolApp {
             logPanel.translate();
             logPanel.recolor();
         }
-        themeButton.setText(palette.dark ? t("button.theme.light") : t("button.theme.dark"));
+        updateThemeButtonLabel();
         refreshTabTitles();
         styleStatusBadge();
         updateActionStates();
@@ -2121,6 +2740,14 @@ public final class PlccomMqttClientToolApp {
         frame.repaint();
     }
 
+    /** Keeps the theme button labelled with the theme it would switch to. */
+    private void updateThemeButtonLabel() {
+        if (themeButton != null) {
+            themeButton.setText(palette.dark ? t("button.theme.light") : t("button.theme.dark"));
+        }
+    }
+
+    /** Refreshes button and field enablement, hopping onto the Swing thread if needed. */
     private void updateActionStates() {
         if (SwingUtilities.isEventDispatchThread()) {
             applyActionStates();
@@ -2129,6 +2756,10 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Enables or disables and re-themes the action buttons and the certificate/Last
+     * Will fields to match the current connection and busy state.
+     */
     private void applyActionStates() {
         boolean busy = operationActive.get();
         boolean connected = client != null && client.isConnected();
@@ -2178,6 +2809,11 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Recursively applies the current palette to a component and its children. A few
+     * components are special-cased by name (header, footer, action bar, subtitle,
+     * license link) or by type (text fields, buttons, tables, combos and so on).
+     */
     private void theme(Component component) {
         String name = component.getName();
         if ("logoPanel".equals(component.getName())) {
@@ -2204,6 +2840,8 @@ public final class PlccomMqttClientToolApp {
                     new EmptyBorder(10, 0, 0, 0)));
         } else if ("subtitle".equals(name)) {
             component.setForeground(palette.muted);
+        } else if ("licenseLink".equals(name)) {
+            component.setForeground(palette.accent);
         }
         if (component instanceof JPanel) {
             JPanel panel = (JPanel) component;
@@ -2254,6 +2892,10 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Colours a button for the current palette and state: primary (accent), secondary
+     * or disabled, with icon-only buttons getting tighter padding.
+     */
     private void themeButton(JButton button) {
         boolean iconOnly = button.getText() == null || button.getText().isEmpty();
         EmptyBorder padding = iconOnly
@@ -2284,12 +2926,14 @@ public final class PlccomMqttClientToolApp {
                 : Cursor.getDefaultCursor());
     }
 
+    /** A bordered card panel with extra inner padding, used as a form column. */
     private JPanel formPanel() {
         JPanel panel = cardPanel(new GridBagLayout());
         panel.setBorder(new EmptyBorder(14, 14, 14, 14));
         return panel;
     }
 
+    /** A panel with the standard themed border and padding used for cards. */
     private JPanel cardPanel(java.awt.LayoutManager layout) {
         JPanel panel = new JPanel(layout);
         panel.setBorder(BorderFactory.createCompoundBorder(
@@ -2298,6 +2942,7 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /** Fresh {@link GridBagConstraints} with the standard form insets and left anchor. */
     private GridBagConstraints formGbc() {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
@@ -2305,6 +2950,7 @@ public final class PlccomMqttClientToolApp {
         return gbc;
     }
 
+    /** Adds one "label + field" row to a form and registers the field's tooltip. */
     private void addRow(JPanel panel, GridBagConstraints gbc, int row, String key, Component field) {
         gbc.gridx = 0;
         gbc.gridy = row;
@@ -2318,6 +2964,7 @@ public final class PlccomMqttClientToolApp {
         panel.add(field, gbc);
     }
 
+    /** Adds a stretching glue row so a form's rows stay top-aligned. */
     private void addFormBottomFiller(JPanel panel, GridBagConstraints gbc, int row) {
         gbc.gridx = 0;
         gbc.gridy = row;
@@ -2330,6 +2977,7 @@ public final class PlccomMqttClientToolApp {
         gbc.weighty = 0;
     }
 
+    /** Lays out the endpoint field with the assistant button on its right. */
     private JPanel endpointInput(JButton assistantButton) {
         JPanel panel = new JPanel(new BorderLayout(8, 0));
         panel.setBorder(BorderFactory.createEmptyBorder());
@@ -2338,10 +2986,13 @@ public final class PlccomMqttClientToolApp {
         setFixedSize(panel, TOOL_FIELD_WIDTH, CONTROL_HEIGHT);
         return panel;
     }
+
+    /** Wraps a field (plus optional trailing controls) in the standard field cell. */
     private JPanel toolInput(JComponent field, Component... trailingComponents) {
         return toolInput(TOOL_FIELD_WIDTH, field, trailingComponents);
     }
 
+    /** Wraps a field of the given width, followed by optional trailing controls. */
     private JPanel toolInput(int width, JComponent field, Component... trailingComponents) {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         panel.setBorder(BorderFactory.createEmptyBorder());
@@ -2353,6 +3004,7 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /** Lays out several controls in a row with even spacing (no fixed width). */
     private JPanel optionRow(Component... components) {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
         panel.setBorder(BorderFactory.createEmptyBorder());
@@ -2365,14 +3017,6 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
-    /**
-     * Lays out a leading checkbox plus a trailing control as one fixed-width field
-     * cell ({@link #TOOL_FIELD_WIDTH}). The checkbox keeps a fixed width so the
-     * trailing control lands at the same position in every language, and the
-     * trailing control fills the rest so its right edge aligns with all other
-     * fields. Without the fixed checkbox width the localized checkbox label (e.g.
-     * "aktiv" vs "active") would shift the trailing control between DE and EN.
-     */
     /**
      * Lays out inline controls (e.g. two checkboxes, or a checkbox plus a button)
      * inside a fixed-width cell ({@link #TOOL_FIELD_WIDTH}). Fixing the width keeps
@@ -2393,6 +3037,11 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /**
+     * Lays out a leading checkbox plus a trailing control as one fixed-width field
+     * cell ({@link #TOOL_FIELD_WIDTH}). The checkbox keeps a fixed width so the
+     * trailing control lands at the same position in every language.
+     */
     private JPanel optionFieldRow(int checkWidth, JCheckBox check, JComponent trailing) {
         JPanel inner = new JPanel(new BorderLayout(8, 0));
         inner.setBorder(BorderFactory.createEmptyBorder());
@@ -2406,6 +3055,7 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /** Wraps a component in a fixed-size holder so form columns stay aligned. */
     private JComponent fixedToolField(int width, JComponent field) {
         JPanel holder = new JPanel(new BorderLayout());
         holder.setBorder(BorderFactory.createEmptyBorder());
@@ -2414,6 +3064,7 @@ public final class PlccomMqttClientToolApp {
         return holder;
     }
 
+    /** A fixed-size, vertically scrolling holder for a multi-line text area. */
     private JScrollPane fixedToolArea(Component component, int height) {
         JScrollPane pane = scroll(component);
         pane.setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
@@ -2421,22 +3072,26 @@ public final class PlccomMqttClientToolApp {
         return pane;
     }
 
+    /** A label whose text is registered for live re-translation. */
     private JLabel label(String key) {
         JLabel label = new JLabel(t(key));
         labelKeys.put(label, key);
         return label;
     }
 
+    /** A button styled as the primary (accent) action of its tab. */
     private JButton primaryButton(String key, Runnable action) {
         JButton button = button(key, iconFor(key), action);
         primaryButtons.add(button);
         return button;
     }
 
+    /** A standard button with an icon auto-chosen from its resource key. */
     private JButton button(String key, Runnable action) {
         return button(key, iconFor(key), action);
     }
 
+    /** Builds a themed button with the given icon and wires its action and tooltip. */
     private JButton button(String key, ToolIcon icon, Runnable action) {
         ToolButton button = new ToolButton();
         button.setText(t(key));
@@ -2456,6 +3111,7 @@ public final class PlccomMqttClientToolApp {
         return button;
     }
 
+    /** A square, icon-only button (e.g. copy/save/clear in the log toolbar). */
     private JButton iconButton(ToolIcon icon, String tooltipKey, Runnable action) {
         JButton button = new JButton(new ToolButtonIcon(icon));
         button.setUI(new javax.swing.plaf.basic.BasicButtonUI());
@@ -2471,6 +3127,7 @@ public final class PlccomMqttClientToolApp {
         return button;
     }
 
+    /** A left-aligned bar of buttons with a top divider, used at the foot of each tab. */
     private JPanel actionBar(JComponent... buttons) {
         JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         bar.setName("actionBar");
@@ -2484,6 +3141,7 @@ public final class PlccomMqttClientToolApp {
         return bar;
     }
 
+    /** Picks a fitting icon for a button based on keywords in its resource key. */
     private ToolIcon iconFor(String key) {
         if ("button.theme".equals(key)) {
             return ToolIcon.THEME;
@@ -2530,6 +3188,7 @@ public final class PlccomMqttClientToolApp {
         return null;
     }
 
+    /** A checkbox whose label is registered for live re-translation. */
     private JCheckBox checkBox(String key, boolean selected) {
         JCheckBox box = new JCheckBox(t(key), selected);
         buttonKeys.put(box, key);
@@ -2537,6 +3196,7 @@ public final class PlccomMqttClientToolApp {
         return box;
     }
 
+    /** Binds a tooltip (when the key exists) and remembers it for re-translation. */
     private void registerTooltip(JComponent component, String key) {
         if (texts.containsKey(key)) {
             tooltipKeys.put(component, key);
@@ -2544,6 +3204,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Binds the same tooltip to a component and all of its children (for wrapped fields). */
     private void registerTooltipTree(Component component, String key) {
         if (!texts.containsKey(key)) {
             return;
@@ -2558,24 +3219,28 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** A text field normalized to the standard control height. */
     private JTextField textField(int columns, String text) {
         JTextField field = new JTextField(text, columns);
         normalizeControlHeight(field);
         return field;
     }
 
+    /** A numeric spinner with thousands grouping (e.g. timeouts in milliseconds). */
     private JSpinner spinner(int value, int min, int max, int step) {
         JSpinner spinner = new JSpinner(new SpinnerNumberModel(value, min, max, step));
         configureSpinner(spinner, true);
         return spinner;
     }
 
+    /** A numeric spinner without grouping (e.g. identifiers and small counts). */
     private JSpinner plainSpinner(int value, int min, int max, int step) {
         JSpinner spinner = new JSpinner(new SpinnerNumberModel(value, min, max, step));
         configureSpinner(spinner, false);
         return spinner;
     }
 
+    /** Sizes and right-aligns a spinner and toggles its thousands grouping. */
     private void configureSpinner(JSpinner spinner, boolean groupingUsed) {
         setFixedSize(spinner, NUMERIC_CONTROL_WIDTH, CONTROL_HEIGHT);
         if (!groupingUsed) {
@@ -2592,6 +3257,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** A combo box sized to at least the standard control width. */
     private JComboBox<String> combo(String... values) {
         JComboBox<String> combo = new JComboBox<String>(new DefaultComboBoxModel<String>(values));
         Dimension preferred = combo.getPreferredSize();
@@ -2599,16 +3265,19 @@ public final class PlccomMqttClientToolApp {
         return combo;
     }
 
+    /** A plain scroll pane around the given component. */
     private JScrollPane scroll(Component component) {
         return new JScrollPane(component);
     }
 
+    /** A left-aligned flow panel with no border, for inline groupings. */
     private JPanel inlinePanel() {
         JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 0));
         panel.setBorder(BorderFactory.createEmptyBorder());
         return panel;
     }
 
+    /** A fixed-width form label, given a help bubble when the field has a tooltip. */
     private JComponent rowLabel(String key) {
         JLabel rowLabel = label(key);
         String tooltipKey = key + ".tip";
@@ -2629,6 +3298,7 @@ public final class PlccomMqttClientToolApp {
         return panel;
     }
 
+    /** The small "?" help bubble that reveals a field's tooltip on hover. */
     private JComponent helpIcon(String tooltipKey) {
         HelpBubble help = new HelpBubble();
         tooltipKeys.put(help, tooltipKey);
@@ -2636,18 +3306,21 @@ public final class PlccomMqttClientToolApp {
         return help;
     }
 
+    /** Whether a field should stretch to fill the remaining width of its form column. */
     private boolean shouldStretch(Component component) {
         return component instanceof JTextComponent
                 || component instanceof JScrollPane
                 || component instanceof JPanel;
     }
 
+    /** Forces a component to the standard control height while keeping its width. */
     private void normalizeControlHeight(JComponent component) {
         Dimension preferred = component.getPreferredSize();
         component.setPreferredSize(new Dimension(preferred.width, CONTROL_HEIGHT));
         component.setMinimumSize(new Dimension(Math.min(preferred.width, 80), CONTROL_HEIGHT));
     }
 
+    /** Pins a component's preferred/min/max size so the layout never resizes it. */
     private void setFixedSize(JComponent component, int width, int height) {
         Dimension size = new Dimension(width, height);
         component.setPreferredSize(size);
@@ -2655,30 +3328,113 @@ public final class PlccomMqttClientToolApp {
         component.setMaximumSize(size);
     }
 
+    /** Loads the PLCcom wordmark, trims its margins and scales it for the header. */
     private Icon loadLogo() {
         try {
             BufferedImage source = ImageIO.read(
-                    PlccomMqttClientToolApp.class.getResource("/assets/PLCcom_720.png"));
-            return new ImageIcon(scaledLogo(source, LOGO_HEIGHT));
+                    PlccomMqttClientToolApp.class.getResource("/assets/PLCcom.png"));
+            return new ImageIcon(scaledLogo(trimLogoMargins(source), LOGO_HEIGHT));
         } catch (Exception ex) {
             return new ImageIcon();
         }
     }
 
     /**
-     * Scales the high-resolution logo to the requested display height while
-     * preserving its aspect ratio. A second variant at twice the size is bundled
-     * so the wordmark also stays crisp on HiDPI (Retina) displays instead of
-     * looking pixelated.
+     * Loads the PLCcom application icon in several sizes so the operating system
+     * can pick the sharpest one for the title bar, task bar and Alt-Tab switcher.
+     */
+    private List<Image> loadAppIcons() {
+        List<Image> icons = new ArrayList<Image>();
+        for (int size : new int[] { 16, 32, 48, 64, 128, 256 }) {
+            try {
+                java.net.URL url = getClass().getResource("/assets/icon/PLCcom_" + size + ".png");
+                if (url != null) {
+                    icons.add(ImageIO.read(url));
+                }
+            } catch (IOException ignored) {
+                // A missing or unreadable size is skipped; the others still apply.
+            }
+        }
+        return icons;
+    }
+
+    /**
+     * Removes the uniform transparent or near-white margin baked into the logo
+     * file so the wordmark fills the header card instead of floating in a wide
+     * white border. Returns the original image when there is nothing to trim.
+     */
+    private static BufferedImage trimLogoMargins(BufferedImage source) {
+        int width = source.getWidth();
+        int height = source.getHeight();
+        int top = 0;
+        int bottom = height - 1;
+        int left = 0;
+        int right = width - 1;
+        while (top < bottom && logoRowIsMargin(source, top)) {
+            top++;
+        }
+        while (bottom > top && logoRowIsMargin(source, bottom)) {
+            bottom--;
+        }
+        while (left < right && logoColumnIsMargin(source, left)) {
+            left++;
+        }
+        while (right > left && logoColumnIsMargin(source, right)) {
+            right--;
+        }
+        if (left == 0 && top == 0 && right == width - 1 && bottom == height - 1) {
+            return source;
+        }
+        return source.getSubimage(left, top, right - left + 1, bottom - top + 1);
+    }
+
+    /** True when the whole row {@code y} of the logo is margin, so it can be trimmed. */
+    private static boolean logoRowIsMargin(BufferedImage image, int y) {
+        for (int x = 0; x < image.getWidth(); x++) {
+            if (!isLogoMarginPixel(image.getRGB(x, y))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** True when the whole column {@code x} of the logo is margin, so it can be trimmed. */
+    private static boolean logoColumnIsMargin(BufferedImage image, int x) {
+        for (int y = 0; y < image.getHeight(); y++) {
+            if (!isLogoMarginPixel(image.getRGB(x, y))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** A pixel counts as margin when it is (almost) transparent or near-white. */
+    private static boolean isLogoMarginPixel(int argb) {
+        int alpha = (argb >>> 24) & 0xFF;
+        if (alpha < 16) {
+            return true;
+        }
+        int red = (argb >> 16) & 0xFF;
+        int green = (argb >> 8) & 0xFF;
+        int blue = argb & 0xFF;
+        return red > 244 && green > 244 && blue > 244;
+    }
+
+    /**
+     * Builds a multi-resolution icon for the requested display height. The base
+     * variant is a bicubically scaled bitmap for pixel-perfect rendering at 100%
+     * display scale; the high-resolution variant is the full-resolution source
+     * itself, so on any HiDPI scale (125%, 150%, 200%, ...) Swing has enough
+     * pixels to downscale smoothly instead of upsizing a small bitmap.
      */
     private static Image scaledLogo(BufferedImage source, int targetHeight) {
         int targetWidth = Math.max(1,
                 Math.round(targetHeight * (float) source.getWidth() / source.getHeight()));
         Image standard = highQualityScale(source, targetWidth, targetHeight);
-        Image hiDpi = highQualityScale(source, targetWidth * 2, targetHeight * 2);
-        return new BaseMultiResolutionImage(standard, hiDpi);
+        return new BaseMultiResolutionImage(standard, source);
     }
 
+    /** Down-scales an image to the target size, halving progressively for a clean result. */
     private static BufferedImage highQualityScale(BufferedImage source, int targetWidth, int targetHeight) {
         BufferedImage current = source;
         int width = source.getWidth();
@@ -2693,6 +3449,7 @@ public final class PlccomMqttClientToolApp {
         return scaleStep(current, targetWidth, targetHeight);
     }
 
+    /** One scaling step: draws the source into a new image with high-quality hints. */
     private static BufferedImage scaleStep(BufferedImage source, int width, int height) {
         BufferedImage target = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = target.createGraphics();
@@ -2708,6 +3465,7 @@ public final class PlccomMqttClientToolApp {
         return target;
     }
 
+    /** Sets the status pill's text and colour for the given status, on the Swing thread. */
     private void setStatus(String key, Status status) {
         SwingUtilities.invokeLater(() -> {
             currentStatus = status;
@@ -2716,6 +3474,7 @@ public final class PlccomMqttClientToolApp {
         });
     }
 
+    /** Updates only the status pill's text, keeping the current status colour. */
     private void setStatusTextOnly(String key) {
         if (statusPill != null) {
             statusPill.setText(t(key));
@@ -2723,6 +3482,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Colours the status pill and its dot to match the current status and theme. */
     private void styleStatusBadge() {
         if (statusPill == null) {
             return;
@@ -2736,55 +3496,101 @@ public final class PlccomMqttClientToolApp {
                 new EmptyBorder(6, 12, 6, 12)));
     }
 
+    // Logging helpers: translate a message key (optionally with arguments), or take
+    // ready-made text, and append it to the log panel at the matching level. Every
+    // helper runs through appendLog so the selected diagnostic level filters the
+    // WHOLE log, exactly like the C# reference tool.
     private void logInfo(String key, Object... args) {
-        logPanel.append(LogLevel.INFO, format(key, args));
+        appendLog(LogLevel.INFO, format(key, args));
     }
 
     private void logSuccess(String key, Object... args) {
-        logPanel.append(LogLevel.SUCCESS, format(key, args));
+        appendLog(LogLevel.SUCCESS, format(key, args));
     }
 
     private void logWarning(String key, Object... args) {
-        logPanel.append(LogLevel.WARNING, format(key, args));
+        appendLog(LogLevel.WARNING, format(key, args));
     }
 
     private void logError(String key, Object... args) {
-        logPanel.append(LogLevel.ERROR, format(key, args));
+        appendLog(LogLevel.ERROR, format(key, args));
     }
 
     private void logInfoText(String text) {
-        logPanel.append(LogLevel.INFO, text);
+        appendLog(LogLevel.INFO, text);
     }
 
     private void logWarningText(String text) {
-        logPanel.append(LogLevel.WARNING, text);
+        appendLog(LogLevel.WARNING, text);
     }
 
     private void logErrorText(String text) {
-        logPanel.append(LogLevel.ERROR, text);
+        appendLog(LogLevel.ERROR, text);
     }
 
+    /**
+     * The single funnel for the tool's own log lines: applies the diagnostic-level
+     * filter before the line reaches the panel. SDK diagnostic events do not pass
+     * through here - they are already filtered inside the SDK dispatcher with the
+     * same selected level.
+     */
+    private void appendLog(LogLevel level, String text) {
+        if (shouldLog(level)) {
+            logPanel.append(level, text);
+        }
+    }
+
+    /**
+     * Decides whether a tool log line passes the selected diagnostic level. This
+     * mirrors the C# reference tool, where the level filters the whole log and
+     * not only SDK diagnostics: Off silences everything, Debug and Info show all
+     * tool lines (the tool itself has no DEBUG lines), Warnings keeps warnings
+     * and errors, Errors keeps errors only, and Fatal leaves only the SDK's
+     * fatal diagnostics visible.
+     */
+    private boolean shouldLog(LogLevel level) {
+        switch (uiLogLevel) {
+            case OFF:
+            case FATAL:
+                return false;
+            case WARNING:
+                return level == LogLevel.WARNING || level == LogLevel.ERROR;
+            case ERROR:
+                return level == LogLevel.ERROR;
+            case DEBUG:
+            case INFO:
+            default:
+                return true;
+        }
+    }
+
+    /** Formats a resource string with {@link java.text.MessageFormat} arguments. */
     private String format(String key, Object... args) {
         return java.text.MessageFormat.format(t(key), args);
     }
 
+    /** Localized text for a key, or a visible {@code !key!} marker when it is missing. */
     private String t(String key) {
         return texts.containsKey(key) ? texts.getString(key) : "!" + key + "!";
     }
 
+    /** The trimmed text of a field. */
     private static String trim(JTextComponent field) {
         return field.getText().trim();
     }
 
+    /** The trimmed text of a field, or {@code null} when it is empty. */
     private static String trimOrNull(JTextComponent field) {
         String value = trim(field);
         return value.length() == 0 ? null : value;
     }
 
+    /** The int value currently held by a spinner. */
     private static int number(JSpinner spinner) {
         return ((Number) spinner.getValue()).intValue();
     }
 
+    /** One-line "Type: message" summary of a throwable for the log. */
     private static String shortCause(Throwable ex) {
         if (ex == null) {
             return "none";
@@ -2792,6 +3598,7 @@ public final class PlccomMqttClientToolApp {
         return ex.getClass().getSimpleName() + ": " + ex.getMessage();
     }
 
+    /** Full "Type: message -&gt; cause -&gt; ..." chain (up to 8 levels) for the details line. */
     private static String detailedCause(Throwable ex) {
         if (ex == null) {
             return "none";
@@ -2814,6 +3621,9 @@ public final class PlccomMqttClientToolApp {
         return builder.toString();
     }
 
+    // Per-user file locations. Settings and PKI material live under the platform's
+    // standard application-data directory (APPDATA on Windows, ~/Library on macOS,
+    // XDG data home on Linux), all beneath a shared PLCcom/Mqtt root.
     private static File settingsFile() {
         return new File(settingsDirectory(), SETTINGS_FILE_NAME);
     }
@@ -2847,6 +3657,9 @@ public final class PlccomMqttClientToolApp {
         return new File(new File(base, "PLCcom"), "Mqtt");
     }
 
+    // Typed settings accessors: each put* writes one widget's value into the
+    // Properties, and each set* restores it. The "protected" text variants
+    // transparently encrypt/decrypt sensitive values (license, credentials, passwords).
     private static void putText(Properties settings, String key, JTextComponent component) {
         settings.setProperty(key, component.getText());
     }
@@ -2915,6 +3728,10 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Encrypts a settings value with AES/GCM and returns a prefixed Base64 string, the
+     * random 12-byte IV prepended to the ciphertext. Returns "" on any failure.
+     */
     private static String encryptSetting(String value) {
         if (value == null || value.length() == 0) {
             return "";
@@ -2934,6 +3751,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Reverses {@link #encryptSetting}; passes plain values through, returns "" on failure. */
     private static String decryptSetting(String value) {
         if (value == null || !value.startsWith(ENCRYPTED_PREFIX)) {
             return value;
@@ -2953,6 +3771,11 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * Derives the AES key with PBKDF2 from stable, machine-local properties (user
+     * name, home and OS name), so the encrypted settings are readable on this account
+     * but do not travel to another machine or user.
+     */
     private static SecretKeySpec settingsKey() throws GeneralSecurityException {
         char[] material = (System.getProperty("user.name", "")
                 + "\n" + System.getProperty("user.home", "")
@@ -2969,11 +3792,18 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /**
+     * The tool version for the window title. The built JAR reports the real
+     * Maven version through the manifest implementation version; without a
+     * manifest (IDE or test runs) the SDK's central {@link VersionInfo} is
+     * used, so no per-tool version constant has to be maintained.
+     */
     private static String version() {
         String version = PlccomMqttClientToolApp.class.getPackage().getImplementationVersion();
-        return version == null ? "2.1.1" : version;
+        return version == null ? VersionInfo.getVersion() : version;
     }
 
+    /** Paints the current window into a PNG file (used by the {@code --screenshot} mode). */
     private void writeScreenshot(File file) throws IOException {
         BufferedImage image = new BufferedImage(frame.getWidth(), frame.getHeight(),
                 BufferedImage.TYPE_INT_ARGB);
@@ -2981,10 +3811,12 @@ public final class PlccomMqttClientToolApp {
         ImageIO.write(image, "png", file);
     }
 
+    /** A {@link Runnable} that may throw, used for the background tool operations. */
     private interface ThrowingRunnable {
         void run() throws Exception;
     }
 
+    /** Header status-pill states, each mapped to a palette colour. */
     private enum Status {
         NEUTRAL, SUCCESS, WARNING, ERROR;
 
@@ -3002,18 +3834,31 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Severity of a log line, which selects its colour. */
     private enum LogLevel {
         INFO, SUCCESS, WARNING, ERROR
     }
 
+    /**
+     * The log panel below the tabs: a coloured, monospaced, size-capped transcript
+     * with a copy/save/clear/detach toolbar and a "max lines" selector. It can also
+     * mirror its content live into a large detached {@link LogWindow}.
+     */
     private final class LogPanel extends JPanel {
         private static final long serialVersionUID = 1L;
+        private static final int DEFAULT_MAX_LINES = 5000;
         private final JTextPane textPane = new JTextPane();
         private final JScrollPane scrollPane = new JScrollPane();
         private final java.util.List<LogLine> entries = new java.util.ArrayList<>();
         private final JButton copyButton = iconButton(ToolIcon.COPY, "button.copyLog", this::copy);
         private final JButton saveButton = iconButton(ToolIcon.SAVE, "button.saveLog", this::save);
         private final JButton clearButton = iconButton(ToolIcon.TRASH, "button.clearLog", this::clear);
+        private final JButton windowButton = iconButton(ToolIcon.WINDOW, "button.logWindow", this::openWindow);
+        private final JComboBox<Integer> maxLinesCombo =
+                new JComboBox<>(new Integer[] { 500, 1000, 5000, 10000 });
+        private final JLabel maxLinesLabel = label("log.maxLines");
+        private int maxLines = DEFAULT_MAX_LINES;
+        private LogWindow logWindow;
 
         LogPanel() {
             super(new BorderLayout(10, 0));
@@ -3032,21 +3877,48 @@ public final class PlccomMqttClientToolApp {
             toolbar.add(saveButton);
             toolbar.add(javax.swing.Box.createVerticalStrut(6));
             toolbar.add(clearButton);
+            toolbar.add(javax.swing.Box.createVerticalStrut(6));
+            toolbar.add(windowButton);
             toolbar.add(javax.swing.Box.createVerticalGlue());
 
+            maxLinesCombo.setSelectedItem(Integer.valueOf(DEFAULT_MAX_LINES));
+            maxLinesCombo.addActionListener(event -> {
+                Integer selected = (Integer) maxLinesCombo.getSelectedItem();
+                if (selected != null) {
+                    maxLines = selected.intValue();
+                    trimToMax();
+                    scheduleSettingsAutoSave();
+                }
+            });
+            JPanel header = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
+            header.setName("logHeader");
+            header.setOpaque(false);
+            header.add(maxLinesLabel);
+            header.add(maxLinesCombo);
+
+            add(header, BorderLayout.NORTH);
             add(toolbar, BorderLayout.WEST);
             add(scrollPane, BorderLayout.CENTER);
             translate();
         }
 
+        /** Re-applies the titled border and colours for the current language and theme. */
         void translate() {
             setBorder(BorderFactory.createTitledBorder(BorderFactory.createLineBorder(palette.border),
                     t("log.title"), TitledBorder.LEFT, TitledBorder.TOP,
                     getFont().deriveFont(Font.BOLD, 12f), palette.muted));
             scrollPane.setBorder(BorderFactory.createLineBorder(palette.border));
+            if (logWindow != null) {
+                logWindow.translate();
+            }
             repaint();
         }
 
+        /**
+         * Appends one timestamped line at the given level (hopping onto the Swing
+         * thread if needed), mirrors it into the detached window if open, and trims
+         * back to the line cap.
+         */
         void append(LogLevel level, String message) {
             if (!SwingUtilities.isEventDispatchThread()) {
                 SwingUtilities.invokeLater(() -> append(level, message));
@@ -3055,17 +3927,49 @@ public final class PlccomMqttClientToolApp {
             String line = TIME.format(new Date()) + "  " + message + System.lineSeparator();
             entries.add(new LogLine(level, line));
             insertLine(level, line);
+            if (logWindow != null) {
+                logWindow.appendLine(level, line);
+            }
+            trimToMax();
             textPane.setCaretPosition(textPane.getStyledDocument().getLength());
         }
 
+        /** Inserts one styled line into the embedded pane. */
         private void insertLine(LogLevel level, String line) {
-            StyledDocument doc = textPane.getStyledDocument();
-            Style style = textPane.addStyle(level.name(), null);
+            insertInto(textPane, level, line);
+        }
+
+        /** Inserts a line into a pane in the colour for its level, rebuilding on error. */
+        private void insertInto(JTextPane target, LogLevel level, String line) {
+            StyledDocument doc = target.getStyledDocument();
+            Style style = target.addStyle(level.name(), null);
             StyleConstants.setForeground(style, color(level));
             try {
                 doc.insertString(doc.getLength(), line, style);
             } catch (BadLocationException ex) {
-                textPane.setText(textPane.getText() + line);
+                target.setText(target.getText() + line);
+            }
+        }
+
+        /** Re-renders every retained line into the given pane in current colours. */
+        private void rebuildPane(JTextPane target) {
+            target.setText("");
+            for (LogLine entry : entries) {
+                insertInto(target, entry.level, entry.text);
+            }
+        }
+
+        /** Removes leading characters from a pane, rebuilding it on any mismatch. */
+        private void removeLeadingFrom(JTextPane target, int chars) {
+            StyledDocument doc = target.getStyledDocument();
+            try {
+                if (chars <= doc.getLength()) {
+                    doc.remove(0, chars);
+                } else {
+                    rebuildPane(target);
+                }
+            } catch (BadLocationException ex) {
+                rebuildPane(target);
             }
         }
 
@@ -3077,18 +3981,67 @@ public final class PlccomMqttClientToolApp {
          * {@code applyTheme()} on every theme change.
          */
         void recolor() {
-            textPane.setText("");
-            for (LogLine entry : entries) {
-                insertLine(entry.level, entry.text);
-            }
+            rebuildPane(textPane);
             textPane.setCaretPosition(textPane.getStyledDocument().getLength());
+            if (logWindow != null) {
+                logWindow.refreshTheme();
+            }
         }
 
+        /** Clears the transcript in the panel and in the detached window. */
         private void clear() {
             entries.clear();
             textPane.setText("");
+            if (logWindow != null) {
+                logWindow.clearText();
+            }
         }
 
+        /** Opens, or re-focuses, the large detached live log window. */
+        private void openWindow() {
+            if (logWindow != null) {
+                logWindow.toFront();
+                logWindow.requestFocus();
+                return;
+            }
+            logWindow = new LogWindow();
+            logWindow.setVisible(true);
+        }
+
+        /**
+         * Drops the oldest log lines once the configured maximum is exceeded, from
+         * both the retained list and the document, so the log stays bounded. The
+         * excess is removed in one pass (amortised); on any offset mismatch the
+         * document is rebuilt from the retained entries.
+         */
+        private void trimToMax() {
+            int excess = entries.size() - maxLines;
+            if (excess <= 0) {
+                return;
+            }
+            int chars = 0;
+            for (int i = 0; i < excess; i++) {
+                chars += entries.get(i).text.length();
+            }
+            entries.subList(0, excess).clear();
+            removeLeadingFrom(textPane, chars);
+            if (logWindow != null) {
+                logWindow.removeLeading(chars);
+            }
+        }
+
+        /** The current maximum number of retained log lines. */
+        int getMaxLines() {
+            return maxLines;
+        }
+
+        void setMaxLines(int value) {
+            // Selecting a valid option fires the listener, which updates maxLines
+            // and trims immediately; an unknown value keeps the current default.
+            maxLinesCombo.setSelectedItem(Integer.valueOf(value));
+        }
+
+        /** Palette colour for a log level. */
         private Color color(LogLevel level) {
             switch (level) {
                 case SUCCESS:
@@ -3102,6 +4055,7 @@ public final class PlccomMqttClientToolApp {
             }
         }
 
+        /** Saves the visible log to a user-chosen file. */
         private void save() {
             JFileChooser chooser = new JFileChooser();
             chooser.setSelectedFile(new File("plccom-mqtt-client-tool.log"));
@@ -3115,6 +4069,7 @@ public final class PlccomMqttClientToolApp {
             }
         }
 
+        /** Copies the selection, or the whole log when nothing is selected, to the clipboard. */
         private void copy() {
             String selectedText = textPane.getSelectedText();
             String value = selectedText == null || selectedText.length() == 0
@@ -3127,6 +4082,93 @@ public final class PlccomMqttClientToolApp {
                     : t("log.copy.selection"));
         }
 
+        /**
+         * Detached large log viewer. It mirrors the docked log live (append,
+         * trim, clear, theme and language changes) and adds an auto-scroll
+         * toggle, so an operator can either follow the newest lines or hold a
+         * scroll position while analysing older output.
+         */
+        private final class LogWindow extends JDialog {
+            private static final long serialVersionUID = 1L;
+            private final JTextPane pane = new JTextPane();
+            private final JScrollPane paneScroll = new JScrollPane();
+            private final JCheckBox autoScrollCheck = new JCheckBox("", true);
+
+            LogWindow() {
+                super(frame);
+                setIconImages(loadAppIcons());
+                setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+                pane.setEditable(false);
+                pane.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+                pane.setBorder(new EmptyBorder(6, 8, 6, 8));
+                // The caret must never follow document changes on its own: with
+                // auto-scroll off the view has to stay exactly where the user
+                // scrolled to, even while new lines keep arriving.
+                ((DefaultCaret) pane.getCaret()).setUpdatePolicy(DefaultCaret.NEVER_UPDATE);
+                paneScroll.setViewportView(pane);
+
+                JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
+                bar.add(autoScrollCheck);
+
+                JPanel content = new JPanel(new BorderLayout(0, 4));
+                content.setBorder(new EmptyBorder(8, 10, 10, 10));
+                content.add(bar, BorderLayout.NORTH);
+                content.add(paneScroll, BorderLayout.CENTER);
+                setContentPane(content);
+
+                setSize(1000, 700);
+                setMinimumSize(new Dimension(640, 400));
+                setLocationRelativeTo(frame);
+                addWindowListener(new java.awt.event.WindowAdapter() {
+                    @Override
+                    public void windowClosed(java.awt.event.WindowEvent event) {
+                        logWindow = null;
+                    }
+                });
+                translate();
+                refreshTheme();
+            }
+
+            /** Re-applies the window title and auto-scroll label for the current language. */
+            void translate() {
+                setTitle(t("log.window.title"));
+                autoScrollCheck.setText(t("log.autoScroll"));
+            }
+
+            /** Appends one already-formatted line and follows the tail when auto-scroll is on. */
+            void appendLine(LogLevel level, String line) {
+                insertInto(pane, level, line);
+                followTail();
+            }
+
+            /** Drops the given number of leading characters to mirror the docked log's trim. */
+            void removeLeading(int chars) {
+                removeLeadingFrom(pane, chars);
+                followTail();
+            }
+
+            /** Empties the detached view. */
+            void clearText() {
+                pane.setText("");
+            }
+
+            /** Re-applies the current palette and re-renders every retained line. */
+            void refreshTheme() {
+                theme(getContentPane());
+                paneScroll.setBorder(BorderFactory.createLineBorder(palette.border));
+                rebuildPane(pane);
+                followTail();
+            }
+
+            /** Scrolls to the newest line, but only while auto-scroll is enabled. */
+            private void followTail() {
+                if (autoScrollCheck.isSelected()) {
+                    pane.setCaretPosition(pane.getStyledDocument().getLength());
+                }
+            }
+        }
+
+        /** One retained log entry: its level (which drives the colour) and rendered text. */
         private final class LogLine {
             private final LogLevel level;
             private final String text;
@@ -3138,6 +4180,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Table cell renderer with theme-aware zebra striping and selection colours. */
     private final class ThemedTableRenderer extends DefaultTableCellRenderer {
         private static final long serialVersionUID = 1L;
 
@@ -3157,6 +4200,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Combo-box popup renderer that matches the current theme. */
     private final class ThemedListRenderer extends DefaultTableCellRenderer
             implements javax.swing.ListCellRenderer<Object> {
         private static final long serialVersionUID = 1L;
@@ -3173,6 +4217,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** The small circular "?" glyph that reveals a field's tooltip on hover. */
     private final class HelpBubble extends JComponent {
         private static final long serialVersionUID = 1L;
         private static final int SIZE = 16;
@@ -3243,7 +4288,7 @@ public final class PlccomMqttClientToolApp {
         LogoCard(Icon logo) {
             this.logo = logo;
             setOpaque(false);
-            Dimension size = new Dimension(logo.getIconWidth() + 28, logo.getIconHeight() + 18);
+            Dimension size = new Dimension(logo.getIconWidth() + 20, logo.getIconHeight() + 12);
             setPreferredSize(size);
             setMinimumSize(size);
             setMaximumSize(size);
@@ -3254,6 +4299,12 @@ public final class PlccomMqttClientToolApp {
             Graphics2D g2 = (Graphics2D) graphics.create();
             try {
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                // Resample the logo smoothly when the display runs at a fractional
+                // scale (125%, 150%, ...). Without this hint Java2D falls back to
+                // nearest-neighbour, which makes the wordmark look pixelated.
+                g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
                 int width = getWidth();
                 int height = getHeight();
                 g2.setColor(Color.WHITE);
@@ -3269,11 +4320,13 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** The set of vector glyphs the tool draws on its buttons. */
     private enum ToolIcon {
         THEME, LANGUAGE, CERTIFICATE, EXIT, START, STOP, PUBLISH, SUBSCRIBE, REQUEST,
-        FILE, ADD, REMOVE, COPY, SAVE, TRASH, REFRESH, RESET
+        FILE, ADD, REMOVE, COPY, SAVE, TRASH, REFRESH, RESET, WINDOW
     }
 
+    /** A small filled dot used as the status pill's colour indicator. */
     private static final class StatusDotIcon implements Icon {
         private static final int SIZE = 10;
         private final Color color;
@@ -3302,6 +4355,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Draws the crisp vector glyph for a {@link ToolIcon} at 16x16, theme-coloured. */
     private static final class ToolButtonIcon implements Icon {
         private static final int SIZE = 16;
         private final ToolIcon icon;
@@ -3415,6 +4469,16 @@ public final class PlccomMqttClientToolApp {
                         g2.fillPolygon(new int[] { x + 8, x + 3, x + 4 },
                                 new int[] { y + 2, y + 1, y + 6 }, 3);
                         break;
+                    case WINDOW:
+                        // Detached-window glyph: a frame with an arrow leaving top-right.
+                        g2.drawLine(x + 3, y + 5, x + 3, y + 13);
+                        g2.drawLine(x + 3, y + 13, x + 11, y + 13);
+                        g2.drawLine(x + 11, y + 13, x + 11, y + 9);
+                        g2.drawLine(x + 3, y + 5, x + 7, y + 5);
+                        g2.drawLine(x + 8, y + 8, x + 13, y + 3);
+                        g2.drawLine(x + 9, y + 3, x + 13, y + 3);
+                        g2.drawLine(x + 13, y + 3, x + 13, y + 7);
+                        break;
                     default:
                         break;
                 }
@@ -3424,6 +4488,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** The parts of a broker endpoint URL, as edited in the endpoint assistant. */
     private static final class EndpointParts {
         final String transport;
         final String host;
@@ -3437,6 +4502,8 @@ public final class PlccomMqttClientToolApp {
             this.path = path;
         }
     }
+
+    /** An immutable colour palette; {@link #dark()} and {@link #light()} are the two themes. */
     private static final class Palette {
         final boolean dark;
         final Color windowBg;
@@ -3493,6 +4560,7 @@ public final class PlccomMqttClientToolApp {
         }
     }
 
+    /** Parsed command-line options for the headless screenshot mode. */
     private static final class StartupArguments {
         final File screenshotFile;
         final boolean light;
@@ -3506,6 +4574,7 @@ public final class PlccomMqttClientToolApp {
             this.tabIndex = tabIndex;
         }
 
+        /** Parses {@code --screenshot}, {@code --light}, {@code --english} and {@code --tab}. */
         static StartupArguments parse(String[] args) {
             File screenshot = null;
             boolean light = false;

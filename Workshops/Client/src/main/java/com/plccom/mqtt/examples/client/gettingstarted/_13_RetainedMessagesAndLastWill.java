@@ -66,6 +66,12 @@ import com.plccom.mqtt.client.PlccomMqttPublishMessage;
  *                        a cable pull). A clean disconnect() suppresses it, so
  *                        receivers can tell a planned shutdown from a failure.
  *
+ * HOW THIS WORKSHOP IS WRITTEN
+ *   Everything happens top-to-bottom inside start(): every client is built and
+ *   connected right where it is used, and every result is checked in place with
+ *   a visible isGood() test. Nothing important is hidden in a helper method, so
+ *   you can read the whole retained/Will story without jumping around.
+ *
  * EXPECTED RESULT
  *   A late subscriber receives the retained status value; after the retained
  *   value is deleted a further subscriber receives nothing; and an observer
@@ -146,40 +152,62 @@ public final class _13_RetainedMessagesAndLastWill {
         System.out.println("  Broker endpoint : " + brokerEndpoint());
         System.out.println();
 
-        // The two parts are independent, so we run them one after another with
-        // their own clients to keep each demonstration easy to follow.
-        demonstrateRetainedMessages();
-        System.out.println();
-        demonstrateLastWill();
-    }
-
-    // ---------------------------------------------------------------------------
-    // Part A: Retained messages (set, read by a late subscriber, then delete)
-    // ---------------------------------------------------------------------------
-    private static void demonstrateRetainedMessages() throws Exception {
+        // =====================================================================
+        // Part A: Retained messages (set, read by a LATE subscriber, delete)
+        // =====================================================================
         System.out.println("  === Part A: Retained messages ===");
 
-        // The publisher stores a retained "online" status. Because it is retained,
-        // the broker keeps it even after the publisher disconnects.
-        PlccomMqttClient publisher = connectedClient("plccom-workshop-13-status-publisher");
+        // -- Step A1: build + connect the publisher, then publish a retained value
+        // The client is built with the same builder shape as Workshop 11 and
+        // connected right here; the CONNECT result is checked in place. retain()
+        // tells the broker to store this exact message as the current value of
+        // STATUS_TOPIC and replay it to every future subscriber.
+        System.out.println("  Connecting the status publisher and storing a retained value ...");
+        PlccomMqttClient publisher = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-13-status-publisher")
+                .endpoint(brokerEndpoint())
+                .mqtt311()
+                .keepAliveSeconds(30)
+                .build();
         try {
-            // -- Step 1: publish a retained status value ----------------------
-            // retain() tells the broker to remember this exact message as the
-            // current value of STATUS_TOPIC and replay it to future subscribers.
+            PlccomMqttConnectResult publisherConnect = publisher.connect();
+            if (!publisherConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (publisher) failed: "
+                        + publisherConnect.getQuality() + " - " + publisherConnect.getMessage());
+            }
+
             System.out.println("  Publishing retained status 'online' to " + STATUS_TOPIC);
-            requireGood("retained PUBLISH", publisher.publish(STATUS_TOPIC, "online")
+            MqttPublishResult retainedPublish = publisher.publish(STATUS_TOPIC, "online")
                     .qos1()
                     .retain()
-                    .send());
+                    .send();
+            if (!retainedPublish.isGood()) {
+                throw new IllegalStateException("retained PUBLISH failed: "
+                        + retainedPublish.getQuality() + " - " + retainedPublish.getMessage());
+            }
 
-            // -- Step 2: a LATE subscriber still receives the retained value ---
-            // This subscriber connects only now, after the message was published.
+            // -- Step A2: a LATE subscriber still receives the retained value --
+            // This subscriber connects only NOW, after the message was published.
             // Thanks to the retained flag it still receives the current value
             // immediately, and the received message carries the retain flag.
             System.out.println("  A late subscriber connects and subscribes ...");
-            PlccomMqttClient lateSubscriber = connectedClient("plccom-workshop-13-late-subscriber");
+            PlccomMqttClient lateSubscriber = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                    .identifier("plccom-workshop-13-late-subscriber")
+                    .endpoint(brokerEndpoint())
+                    .mqtt311()
+                    .keepAliveSeconds(30)
+                    .build();
             try {
-                requireGood("SUBSCRIBE", lateSubscriber.subscribe(STATUS_TOPIC).qos1().send());
+                PlccomMqttConnectResult lateConnect = lateSubscriber.connect();
+                if (!lateConnect.isGood()) {
+                    throw new IllegalStateException("CONNECT (late subscriber) failed: "
+                            + lateConnect.getQuality() + " - " + lateConnect.getMessage());
+                }
+                MqttSubscribeResult lateSubscribe = lateSubscriber.subscribe(STATUS_TOPIC).qos1().send();
+                if (!lateSubscribe.isGood()) {
+                    throw new IllegalStateException("SUBSCRIBE (late subscriber) failed: "
+                            + lateSubscribe.getQuality() + " - " + lateSubscribe.getMessage());
+                }
                 PlccomMqttPublishMessage retained = lateSubscriber.receive(3000);
                 if (retained == null) {
                     throw new IllegalStateException("The retained status was not delivered to the late subscriber.");
@@ -191,21 +219,39 @@ public final class _13_RetainedMessagesAndLastWill {
                 lateSubscriber.close();
             }
 
-            // -- Step 3: delete the retained value ----------------------------
+            // -- Step A3: delete the retained value ---------------------------
             // Publishing a ZERO-LENGTH payload with the retain flag is the MQTT
             // way to clear the stored value. After this, new subscribers get
             // nothing until a fresh value is published.
             System.out.println("  Deleting the retained value (empty retained publish) ...");
-            requireGood("retained deletion PUBLISH", publisher.publish(STATUS_TOPIC, new byte[0])
+            MqttPublishResult deletion = publisher.publish(STATUS_TOPIC, new byte[0])
                     .qos1()
                     .retain()
-                    .send());
+                    .send();
+            if (!deletion.isGood()) {
+                throw new IllegalStateException("retained deletion PUBLISH failed: "
+                        + deletion.getQuality() + " - " + deletion.getMessage());
+            }
 
-            // -- Step 4: a further subscriber now receives nothing ------------
+            // -- Step A4: a further subscriber now receives nothing -----------
             System.out.println("  Another subscriber connects and should receive no retained value ...");
-            PlccomMqttClient afterDeletion = connectedClient("plccom-workshop-13-after-deletion");
+            PlccomMqttClient afterDeletion = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                    .identifier("plccom-workshop-13-after-deletion")
+                    .endpoint(brokerEndpoint())
+                    .mqtt311()
+                    .keepAliveSeconds(30)
+                    .build();
             try {
-                requireGood("SUBSCRIBE", afterDeletion.subscribe(STATUS_TOPIC).qos1().send());
+                PlccomMqttConnectResult afterConnect = afterDeletion.connect();
+                if (!afterConnect.isGood()) {
+                    throw new IllegalStateException("CONNECT (after-deletion subscriber) failed: "
+                            + afterConnect.getQuality() + " - " + afterConnect.getMessage());
+                }
+                MqttSubscribeResult afterSubscribe = afterDeletion.subscribe(STATUS_TOPIC).qos1().send();
+                if (!afterSubscribe.isGood()) {
+                    throw new IllegalStateException("SUBSCRIBE (after-deletion subscriber) failed: "
+                            + afterSubscribe.getQuality() + " - " + afterSubscribe.getMessage());
+                }
                 PlccomMqttPublishMessage shouldBeNull = afterDeletion.receive(1500);
                 if (shouldBeNull != null) {
                     throw new IllegalStateException("A deleted retained value must not be replayed.");
@@ -217,24 +263,42 @@ public final class _13_RetainedMessagesAndLastWill {
         } finally {
             publisher.close();
         }
-    }
 
-    // ---------------------------------------------------------------------------
-    // Part B: Last Will (fires on ungraceful drop, suppressed on clean disconnect)
-    // ---------------------------------------------------------------------------
-    private static void demonstrateLastWill() throws Exception {
+        System.out.println();
+
+        // =====================================================================
+        // Part B: Last Will (fires on ungraceful drop, suppressed on clean close)
+        // =====================================================================
         System.out.println("  === Part B: Last Will ===");
 
+        // -- Step B1: an observer subscribes to the Will topic ----------------
         // The observer represents a supervision system that wants to know when a
-        // device disappears unexpectedly.
-        PlccomMqttClient observer = connectedClient("plccom-workshop-13-will-observer");
+        // device disappears unexpectedly. It is built and connected right here.
+        System.out.println("  Connecting the observer that watches " + WILL_TOPIC + " ...");
+        PlccomMqttClient observer = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-13-will-observer")
+                .endpoint(brokerEndpoint())
+                .mqtt311()
+                .keepAliveSeconds(30)
+                .build();
         try {
-            requireGood("SUBSCRIBE", observer.subscribe(WILL_TOPIC).qos1().send());
+            PlccomMqttConnectResult observerConnect = observer.connect();
+            if (!observerConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (observer) failed: "
+                        + observerConnect.getQuality() + " - " + observerConnect.getMessage());
+            }
+            MqttSubscribeResult observerSubscribe = observer.subscribe(WILL_TOPIC).qos1().send();
+            if (!observerSubscribe.isGood()) {
+                throw new IllegalStateException("SUBSCRIBE (observer) failed: "
+                        + observerSubscribe.getQuality() + " - " + observerSubscribe.getMessage());
+            }
 
-            // -- Step 1: a client connects WITH a Last Will -------------------
-            // The Will is handed to the broker during CONNECT. We keep it simple
-            // here (topic, payload, QoS 1) so it works the same on MQTT 3.1.1.
-            System.out.println("  A watched client connects with a Last Will on " + WILL_TOPIC);
+            // -- Step B2: a client connects WITH a Last Will, then drops hard --
+            // The Will is handed to the broker during CONNECT via will(...).done().
+            // close() then shuts the socket WITHOUT sending an MQTT DISCONNECT,
+            // which looks to the broker exactly like a crash - the trigger for it
+            // to publish the Will.
+            System.out.println("  A watched client connects with a Last Will and is dropped ungracefully ...");
             PlccomMqttClient watched = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
                     .identifier("plccom-workshop-13-watched-device")
                     .endpoint(brokerEndpoint())
@@ -244,14 +308,12 @@ public final class _13_RetainedMessagesAndLastWill {
                     .qos1()
                     .done()
                     .build();
-            requireGoodConnect(watched.connect());
-
-            // -- Step 2: drop the client WITHOUT a clean disconnect -----------
-            // close() shuts the socket without sending an MQTT DISCONNECT, which
-            // looks to the broker exactly like a crash or a lost network. That is
-            // the trigger for the broker to publish the Last Will.
-            System.out.println("  Dropping the watched client ungracefully (socket close, no DISCONNECT) ...");
-            watched.close();
+            PlccomMqttConnectResult watchedConnect = watched.connect();
+            if (!watchedConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (watched device) failed: "
+                        + watchedConnect.getQuality() + " - " + watchedConnect.getMessage());
+            }
+            watched.close(); // socket close, no DISCONNECT -> the broker fires the Will
 
             PlccomMqttPublishMessage will = observer.receive(3000);
             if (will == null) {
@@ -260,7 +322,7 @@ public final class _13_RetainedMessagesAndLastWill {
             System.out.println("    observer received the Will: '"
                     + new MqttMessage(will).payloadAsString() + "'");
 
-            // -- Step 3: a clean disconnect must NOT trigger a Will -----------
+            // -- Step B3: a clean disconnect must NOT trigger a Will ----------
             // The same setup, but this time we call disconnect(), which sends a
             // proper MQTT DISCONNECT. The broker then discards the Will, so a
             // planned shutdown does not raise a false "device lost" alarm.
@@ -274,8 +336,12 @@ public final class _13_RetainedMessagesAndLastWill {
                     .qos1()
                     .done()
                     .build();
-            requireGoodConnect(graceful.connect());
-            graceful.disconnect();
+            PlccomMqttConnectResult gracefulConnect = graceful.connect();
+            if (!gracefulConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (graceful device) failed: "
+                        + gracefulConnect.getQuality() + " - " + gracefulConnect.getMessage());
+            }
+            graceful.disconnect(); // clean DISCONNECT -> the broker discards the Will
 
             PlccomMqttPublishMessage noWill = observer.receive(1500);
             if (noWill != null) {
@@ -290,46 +356,9 @@ public final class _13_RetainedMessagesAndLastWill {
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Small private helpers, kept inside this same workshop class. They only
-    // remove repetition (building/connecting a client, checking a result). The
-    // MQTT actions themselves stay visible in the steps above.
-    // ---------------------------------------------------------------------------
-
-    private static PlccomMqttClient connectedClient(String clientId) throws Exception {
-        PlccomMqttClient client = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .identifier(clientId)
-                .endpoint(brokerEndpoint())
-                .mqtt311()
-                .keepAliveSeconds(30)
-                .build();
-        requireGoodConnect(client.connect());
-        return client;
-    }
-
-    private static void requireGoodConnect(PlccomMqttConnectResult result) {
-        if (!result.isGood()) {
-            throw new IllegalStateException("CONNECT failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-    }
-
-    private static void requireGood(String operation, MqttSubscribeResult result) {
-        if (!result.isGood()) {
-            throw new IllegalStateException(operation + " failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-    }
-
-    private static void requireGood(String operation, MqttPublishResult result) {
-        if (!result.isGood()) {
-            throw new IllegalStateException(operation + " failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-    }
-
-    // Resolves the broker endpoint: the visible constant, or an optional
-    // system-property override used by the internal automation.
+    // Small private helper, kept inside this same workshop class on purpose: it
+    // only resolves the broker endpoint (constant, or an optional system-property
+    // override for automation). It carries no MQTT learning logic.
     private static String brokerEndpoint() {
         return System.getProperty("plccom.mqtt.workshop.endpoint", BROKER_ENDPOINT);
     }

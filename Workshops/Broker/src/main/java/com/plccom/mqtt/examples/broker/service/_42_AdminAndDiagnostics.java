@@ -125,7 +125,7 @@ public final class _42_AdminAndDiagnostics {
         // -- Step 1: start the broker with a diagnostic listener --------------
         final CountDownLatch listenerFailureReported = new CountDownLatch(1);
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .tcpPort(0)
+                .tcpPort(1883) // 1883 is the standard MQTT-over-TCP port
                 .diagnosticLevel(PlccomMqttDiagnosticLevel.WARNING)
                 .onDiagnostic(event -> {
                     System.out.println("    [diagnostic] " + event.getSeverity()

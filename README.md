@@ -37,7 +37,7 @@ Everything here uses the **high-level PLCcom MQTT API** only — the comfortable
 pom.xml                             reactor: builds the modules below in the right order
 PLCcom.Console/                     shared Swing console window
 Workshops/
-  Client/                           12 client workshops (grouped 1x..4x)
+  Client/                           13 client workshops (grouped 1x..4x)
     gettingstarted/  mqtt5/  resilience/  security/
   Broker/                           10 broker workshops (grouped 1x..4x)
     basics/  embedded/  security/  service/
@@ -63,7 +63,7 @@ Each workshop class is numbered `_1x`, `_2x`, `_3x`, `_4x`. The tens digit is th
 | 3 | `gettingstarted/_13_RetainedMessagesAndLastWill` | Remember state and announce unexpected disconnects. |
 | 4 | `mqtt5/_21..._24` | MQTT 5 properties, subscription options, request/response and JSON. |
 | 5 | `resilience/_31..._33` | Sessions, reconnect, async API and shared subscriptions. |
-| 6 | `security/_41_SecureConnection` & `_42_DiagnosticsAndErrorHandling` | TLS/mTLS/WSS and structured diagnostics. |
+| 6 | `security/_41_SecureConnection`, `_42_DiagnosticsAndErrorHandling` & `_43_EnhancedAuthentication` | TLS/mTLS/WSS, structured diagnostics and MQTT 5 enhanced authentication. |
 
 **Broker** — start here if you host a broker:
 
@@ -94,17 +94,22 @@ Every client workshop reads its broker address from a visible `BROKER_ENDPOINT` 
 The examples use the PLCcom MQTT Java packages:
 
 ~~~xml
+<!-- Client-side applications -->
 <dependency>
     <groupId>com.indi-an.plccom</groupId>
     <artifactId>plccom-mqtt-client</artifactId>
-    <version>2.x.x</version>
+    <version>2.1.2</version>
 </dependency>
+
+<!-- Broker-side applications -->
 <dependency>
     <groupId>com.indi-an.plccom</groupId>
     <artifactId>plccom-mqtt-broker</artifactId>
-    <version>2.x.x</version>
+    <version>2.1.2</version>
 </dependency>
 ~~~
+
+Both artifacts are on Maven Central and pull in `plccom-mqtt-core` (and gson) transitively, so you only declare the side you use.
 
 **Each module is self-contained.** Open any module's own `pom.xml` and the SDK version is written right there, at the dependency — there is no hidden parent that controls it. To target another PLCcom MQTT release, change the `<version>` in the module you build (the workshop or reference-application module you are using).
 
@@ -188,6 +193,7 @@ mvn -f Reference_Applications/Broker/pom.xml exec:java
 | 33 | Shared Subscriptions | Load-balance a job stream across two workers. |
 | 41 | Secure Connection | TLS, WSS and mutual TLS with a client-side trust/key store. |
 | 42 | Diagnostics & Error Handling | Diagnostic listener, level filtering, Quality checks and error handling. |
+| 43 | Enhanced Authentication | Client-side MQTT 5 enhanced authentication: method + token and AUTH challenges (pairs with Broker 32). |
 
 ## 🛰️ Broker Workshop Map
 

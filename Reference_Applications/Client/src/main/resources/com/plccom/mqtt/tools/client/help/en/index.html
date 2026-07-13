@@ -57,9 +57,10 @@
 
       <section id="security">
         <h2>TLS and certificates</h2>
-        <p>For <code>mqtts://</code> and <code>wss://</code>, the tool validates the broker certificate through the fixed client PKI store below <code>PLCcom/Mqtt/Client/pki</code>. Unknown certificates are placed into <code>rejected/certs</code> and can be reviewed through <strong>Certificates</strong>.</p>
-        <p>If the broker requires a client certificate, enable <strong>Send TLS client certificate</strong>. The tool then uses its own identity from <code>pki/own</code>. If it is missing, the library creates it automatically.</p>
-        <div class="success">After trusting a certificate, start the connection again. The first attempt remains rejected for safety.</div>
+        <p>For <code>mqtts://</code> and <code>wss://</code>, the tool validates the broker certificate through the fixed client PKI store below <code>PLCcom/Mqtt/Client/pki</code>. Unknown certificates are placed into <code>rejected/certs</code> and can be reviewed through <strong>Certificates</strong>. Trust is not the only check: the broker certificate must also match the host part of the endpoint, for example <code>my_broker_host</code> in <code>mqtts://my_broker_host:8883</code>. If a trusted certificate has only <code>localhost</code> in its SAN/CN, the connection remains rejected for that host.</p>
+        <div class="note">Host names that contain an underscore (Windows or NetBIOS computer names such as <code>my_broker_host</code>) are supported for <code>mqtts://</code> and <code>wss://</code>. The standard Java host check rejects such names, so the tool matches the certificate host itself; the broker certificate must still cover that host in its SAN.</div>
+        <p>If the broker requires a client certificate, enable <strong>Send TLS client certificate</strong>. The tool then uses its own identity from <code>pki/own</code>. If it is missing, the library creates it automatically. This client certificate is used as client identity for mTLS and access validation; it is not expected to match the broker host name.</p>
+        <div class="success">After trusting a certificate, start the connection again. The first attempt remains rejected for safety. If the next attempt still fails with a host-name mismatch, create or select a broker certificate whose SAN/CN contains the endpoint host.</div>
       </section>
 
       <section id="last-will">
@@ -146,7 +147,10 @@
 
       <section id="messages">
         <h2>Messages, log and diagnostics</h2>
-        <p>Received messages appear in the <strong>Messages</strong> tab and in the log. The log also shows connection state, failures, certificate events and diagnostics.</p><p>The <strong>Diagnostic level</strong> on the connection page controls how much internal detail is shown: <strong>Debug</strong> for detailed troubleshooting, <strong>Info</strong> as the normal default, <strong>Warnings/Errors/Fatal</strong> for reduced output and <strong>Off</strong> to suppress diagnostic events.</p>
+        <p>Received messages appear in the <strong>Messages</strong> tab and in the log. The log also shows connection state, failures, certificate events and diagnostics.</p>
+        <p>The <strong>Diagnostic level</strong> (bottom left) controls the whole log &mdash; SDK diagnostic events and the tool messages: <strong>Debug</strong> for detailed troubleshooting, <strong>Info</strong> as the normal default, <strong>Warnings/Errors</strong> reduce the output to problems, <strong>Fatal</strong> shows only fatal SDK failures and <strong>Off</strong> hides everything. Changing the level takes effect immediately on a live connection &mdash; no reconnect needed.</p>
+        <p><strong>Message payloads at Debug.</strong> At the <strong>Debug</strong> level a diagnostic entry shows the exact content of every published and received message &mdash; as text, or as hex for binary data, truncated to a single line. This is handy for analysis, but remember that payloads can contain sensitive data, so keep Debug off unless you need it.</p>
+        <p><strong>Large log window.</strong> The window icon in the log toolbar opens the log in a separate, resizable live view. Its <strong>Auto-scroll</strong> switch lets you either follow the newest lines or hold your position while you read older output. <strong>Max. lines</strong> caps the retained log (the oldest lines are dropped) so long analysis sessions stay responsive.</p>
         <p>The log buttons copy, save or clear the output. For support, copy the relevant log lines including the root cause.</p>
       </section>
 
@@ -156,13 +160,13 @@
           <tr><th>Symptom</th><th>Likely cause</th><th>Next step</th></tr>
           <tr><td>Connection refused</td><td>Broker is not running or the port is wrong.</td><td>Start the broker and check endpoint and port.</td></tr>
           <tr><td>UnknownHostException</td><td>The host name cannot be resolved.</td><td>Check DNS, spelling or use an IP address.</td></tr>
-          <tr><td>Certificate not trusted</td><td>The broker certificate is not in the trusted store.</td><td>Open <strong>Certificates</strong> and review the certificate.</td></tr>
+          <tr><td>Certificate not trusted</td><td>The broker certificate is not in the trusted store.</td><td>Open <strong>Certificates</strong> and review the certificate.</td></tr><tr><td>Certificate does not match host</td><td>The certificate is trusted, but its SAN/CN does not contain the endpoint host.</td><td>Use a broker certificate for that host or connect with the host name contained in the certificate.</td></tr>
           <tr><td>BAD_MQTT5_NOT_AUTHORIZED</td><td>The broker denies publish or subscribe.</td><td>Check credentials, access validator and topic.</td></tr>
           <tr><td>Topic contains wildcards</td><td>Wildcards are not allowed for publish.</td><td>Use a concrete topic name for sending.</td></tr>
         </table>
       </section>
     </div>
   </main>
-  <footer class="footer">PLCcom MQTT Client Tool 2.1.1 - local offline help shipped with the application.</footer>
+  <footer class="footer">PLCcom MQTT Client Tool 2.x.x - local offline help shipped with the application.</footer>
 </body>
 </html>

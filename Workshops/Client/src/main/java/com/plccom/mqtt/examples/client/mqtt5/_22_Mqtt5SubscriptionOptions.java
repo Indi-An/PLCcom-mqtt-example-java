@@ -66,6 +66,12 @@ import com.plccom.mqtt.client.PlccomMqttPublishMessage;
  *                               (retainHandlingSendAtSubscribe / ...IfNew /
  *                               retainHandlingDoNotSend).
  *
+ * HOW THIS WORKSHOP IS WRITTEN
+ *   The three parts run one after another, top-to-bottom inside start(). Every
+ *   client is built and connected where it is used, and every SUBSCRIBE/PUBLISH
+ *   result is checked in place with a visible isGood() test - nothing important
+ *   is tucked away in a helper method.
+ *
  * EXPECTED RESULT
  *   The console shows the Subscription Identifier echoed back, a self-message
  *   suppressed by No Local while another client's message still arrives, and the
@@ -136,53 +142,100 @@ public final class _22_Mqtt5SubscriptionOptions {
         System.out.println("  Broker endpoint : " + brokerEndpoint());
         System.out.println();
 
-        demonstrateSubscriptionIdentifier();
-        System.out.println();
-        demonstrateNoLocal();
-        System.out.println();
-        demonstrateRetainAsPublished();
-    }
-
-    // ---------------------------------------------------------------------------
-    // Part A: Subscription Identifier
-    // ---------------------------------------------------------------------------
-    private static void demonstrateSubscriptionIdentifier() throws Exception {
+        // =====================================================================
+        // Part A: Subscription Identifier
+        // =====================================================================
         System.out.println("  === Part A: Subscription Identifier ===");
-        final String topic = "plccom/workshop/22/subid";
-        PlccomMqttClient client = connectedClient("plccom-workshop-22-subid");
-        try {
-            // The identifier 77 is our own label for this subscription. The broker
-            // will attach it to every message delivered because of this subscribe.
-            requireGood("SUBSCRIBE", client.subscribe(topic).qos1().subscriptionIdentifier(77).send());
-            requireGood("PUBLISH", client.publish(topic, "hello").qos1().send());
+        final String subIdTopic = "plccom/workshop/22/subid";
 
-            PlccomMqttPublishMessage received = client.receive(3000);
-            if (received == null) {
+        // Build and connect one MQTT 5 client for this part.
+        PlccomMqttClient subIdClient = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-22-subid")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        try {
+            PlccomMqttConnectResult subIdConnect = subIdClient.connect();
+            if (!subIdConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (subid client) failed: "
+                        + subIdConnect.getQuality() + " - " + subIdConnect.getMessage());
+            }
+
+            // The identifier 77 is our own label for this subscription. The broker
+            // attaches it to every message delivered because of this subscribe.
+            MqttSubscribeResult subIdSubscribe = subIdClient.subscribe(subIdTopic)
+                    .qos1()
+                    .subscriptionIdentifier(77)
+                    .send();
+            if (!subIdSubscribe.isGood()) {
+                throw new IllegalStateException("SUBSCRIBE (subid) failed: "
+                        + subIdSubscribe.getQuality() + " - " + subIdSubscribe.getMessage());
+            }
+
+            MqttPublishResult subIdPublish = subIdClient.publish(subIdTopic, "hello").qos1().send();
+            if (!subIdPublish.isGood()) {
+                throw new IllegalStateException("PUBLISH (subid) failed: "
+                        + subIdPublish.getQuality() + " - " + subIdPublish.getMessage());
+            }
+
+            PlccomMqttPublishMessage subIdReceived = subIdClient.receive(3000);
+            if (subIdReceived == null) {
                 throw new IllegalStateException("No message received for the Subscription Identifier demo.");
             }
             System.out.println("    delivered subscription identifiers: "
-                    + new MqttMessage(received).subscriptionIdentifiers() + " (expected [77])");
+                    + new MqttMessage(subIdReceived).subscriptionIdentifiers() + " (expected [77])");
         } finally {
-            client.close();
+            subIdClient.close();
         }
-    }
 
-    // ---------------------------------------------------------------------------
-    // Part B: No Local
-    // ---------------------------------------------------------------------------
-    private static void demonstrateNoLocal() throws Exception {
+        System.out.println();
+
+        // =====================================================================
+        // Part B: No Local (two clients - one publishes its own topic, one other)
+        // =====================================================================
         System.out.println("  === Part B: No Local ===");
-        final String topic = "plccom/workshop/22/nolocal";
-        PlccomMqttClient self = connectedClient("plccom-workshop-22-self");
-        PlccomMqttClient other = connectedClient("plccom-workshop-22-other");
+        final String noLocalTopic = "plccom/workshop/22/nolocal";
+
+        PlccomMqttClient self = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-22-self")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        PlccomMqttClient other = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-22-other")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
         try {
+            PlccomMqttConnectResult selfConnect = self.connect();
+            if (!selfConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (self) failed: "
+                        + selfConnect.getQuality() + " - " + selfConnect.getMessage());
+            }
+            PlccomMqttConnectResult otherConnect = other.connect();
+            if (!otherConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (other) failed: "
+                        + otherConnect.getQuality() + " - " + otherConnect.getMessage());
+            }
+
             // With No Local, the broker will not send this client its OWN messages
             // on this subscription - a simple way to avoid echo/feedback loops.
-            requireGood("SUBSCRIBE", self.subscribe(topic).qos1().noLocal().send());
+            MqttSubscribeResult noLocalSubscribe = self.subscribe(noLocalTopic).qos1().noLocal().send();
+            if (!noLocalSubscribe.isGood()) {
+                throw new IllegalStateException("SUBSCRIBE (no local) failed: "
+                        + noLocalSubscribe.getQuality() + " - " + noLocalSubscribe.getMessage());
+            }
 
             // The client publishes to the same topic it subscribed to. Because of
             // No Local, it must NOT receive this message back.
-            requireGood("PUBLISH self", self.publish(topic, "my own message").qos1().send());
+            MqttPublishResult selfPublish = self.publish(noLocalTopic, "my own message").qos1().send();
+            if (!selfPublish.isGood()) {
+                throw new IllegalStateException("PUBLISH (self) failed: "
+                        + selfPublish.getQuality() + " - " + selfPublish.getMessage());
+            }
             PlccomMqttPublishMessage ownEcho = self.receive(600);
             if (ownEcho != null) {
                 throw new IllegalStateException("No Local should have suppressed the client's own message.");
@@ -191,7 +244,11 @@ public final class _22_Mqtt5SubscriptionOptions {
 
             // A different client publishes the same topic. No Local only filters
             // the SAME client, so this message must still arrive.
-            requireGood("PUBLISH other", other.publish(topic, "message from another client").qos1().send());
+            MqttPublishResult otherPublish = other.publish(noLocalTopic, "message from another client").qos1().send();
+            if (!otherPublish.isGood()) {
+                throw new IllegalStateException("PUBLISH (other) failed: "
+                        + otherPublish.getQuality() + " - " + otherPublish.getMessage());
+            }
             PlccomMqttPublishMessage external = self.receive(3000);
             if (external == null) {
                 throw new IllegalStateException("No Local must not suppress another client's message.");
@@ -202,28 +259,74 @@ public final class _22_Mqtt5SubscriptionOptions {
             other.close();
             self.close();
         }
-    }
 
-    // ---------------------------------------------------------------------------
-    // Part C: Retain As Published
-    // ---------------------------------------------------------------------------
-    private static void demonstrateRetainAsPublished() throws Exception {
+        System.out.println();
+
+        // =====================================================================
+        // Part C: Retain As Published (a normal and a retain-as-published sub)
+        // =====================================================================
         System.out.println("  === Part C: Retain As Published ===");
-        final String topic = "plccom/workshop/22/retain-as-published";
-        PlccomMqttClient normalSub = connectedClient("plccom-workshop-22-normal");
-        PlccomMqttClient rapSub = connectedClient("plccom-workshop-22-rap");
-        PlccomMqttClient publisher = connectedClient("plccom-workshop-22-publisher");
+        final String rapTopic = "plccom/workshop/22/retain-as-published";
+
+        PlccomMqttClient normalSub = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-22-normal")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        PlccomMqttClient rapSub = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-22-rap")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        PlccomMqttClient publisher = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-22-publisher")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
         try {
+            PlccomMqttConnectResult normalConnect = normalSub.connect();
+            if (!normalConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (normal subscriber) failed: "
+                        + normalConnect.getQuality() + " - " + normalConnect.getMessage());
+            }
+            PlccomMqttConnectResult rapConnect = rapSub.connect();
+            if (!rapConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (retain-as-published subscriber) failed: "
+                        + rapConnect.getQuality() + " - " + rapConnect.getMessage());
+            }
+            PlccomMqttConnectResult publisherConnect = publisher.connect();
+            if (!publisherConnect.isGood()) {
+                throw new IllegalStateException("CONNECT (publisher) failed: "
+                        + publisherConnect.getQuality() + " - " + publisherConnect.getMessage());
+            }
+
             // Normally, when a live (already subscribed) client receives a message,
             // the broker clears the retain flag. Retain As Published keeps it set,
             // so this subscriber can still tell the message was published retained.
             // (Retain Handling, by contrast, would control whether OLD retained
             //  messages are replayed at subscribe time - not shown separately here.)
-            requireGood("SUBSCRIBE normal", normalSub.subscribe(topic).qos1().send());
-            requireGood("SUBSCRIBE rap", rapSub.subscribe(topic).qos1().retainAsPublished().send());
+            MqttSubscribeResult normalSubscribe = normalSub.subscribe(rapTopic).qos1().send();
+            if (!normalSubscribe.isGood()) {
+                throw new IllegalStateException("SUBSCRIBE (normal) failed: "
+                        + normalSubscribe.getQuality() + " - " + normalSubscribe.getMessage());
+            }
+            MqttSubscribeResult rapSubscribe = rapSub.subscribe(rapTopic).qos1().retainAsPublished().send();
+            if (!rapSubscribe.isGood()) {
+                throw new IllegalStateException("SUBSCRIBE (retain as published) failed: "
+                        + rapSubscribe.getQuality() + " - " + rapSubscribe.getMessage());
+            }
 
-            requireGood("PUBLISH retained live",
-                    publisher.publish(topic, "live retained value").qos1().retain().send());
+            MqttPublishResult retainedLive = publisher.publish(rapTopic, "live retained value")
+                    .qos1()
+                    .retain()
+                    .send();
+            if (!retainedLive.isGood()) {
+                throw new IllegalStateException("PUBLISH (retained live) failed: "
+                        + retainedLive.getQuality() + " - " + retainedLive.getMessage());
+            }
 
             PlccomMqttPublishMessage normal = normalSub.receive(3000);
             PlccomMqttPublishMessage rap = rapSub.receive(3000);
@@ -244,40 +347,9 @@ public final class _22_Mqtt5SubscriptionOptions {
         }
     }
 
-    // ---------------------------------------------------------------------------
-    // Small private helpers kept inside this workshop class (only remove
-    // repetition; the MQTT actions themselves stay visible above).
-    // ---------------------------------------------------------------------------
-
-    private static PlccomMqttClient connectedClient(String clientId) throws Exception {
-        PlccomMqttClient client = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .identifier(clientId)
-                .endpoint(brokerEndpoint())
-                .mqtt5()
-                .keepAliveSeconds(30)
-                .build();
-        PlccomMqttConnectResult result = client.connect();
-        if (!result.isGood()) {
-            throw new IllegalStateException("CONNECT failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-        return client;
-    }
-
-    private static void requireGood(String operation, MqttSubscribeResult result) {
-        if (!result.isGood()) {
-            throw new IllegalStateException(operation + " failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-    }
-
-    private static void requireGood(String operation, MqttPublishResult result) {
-        if (!result.isGood()) {
-            throw new IllegalStateException(operation + " failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-    }
-
+    // Small private helper, kept inside this same workshop class on purpose: it
+    // only resolves the broker endpoint (constant, or an optional system-property
+    // override for automation). It carries no MQTT learning logic.
     private static String brokerEndpoint() {
         return System.getProperty("plccom.mqtt.workshop.endpoint", BROKER_ENDPOINT);
     }

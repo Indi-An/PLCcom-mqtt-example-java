@@ -32,6 +32,8 @@ import com.plccom.mqtt.client.PlccomMqttClientFactory;
 import com.plccom.mqtt.client.PlccomMqttConnectResult;
 import com.plccom.mqtt.client.PlccomMqttPublishMessage;
 import com.plccom.mqtt.client.PlccomMqttTlsOptions;
+import com.plccom.mqtt.pki.PlccomMqttPkiOptions;
+import com.plccom.mqtt.pki.PlccomMqttRemoteCertificateValidationResult;
 
 /**
  * Workshop 41 - Secure Connection with TLS and mTLS (Security)
@@ -65,8 +67,15 @@ import com.plccom.mqtt.client.PlccomMqttTlsOptions;
  *                             broker side.
  *   - Key Store / mTLS      : holds this client's private key and certificate,
  *                             presented so the broker can authenticate the client.
- *   - Hostname verification : checks that the broker certificate name matches the
- *                             endpoint host.
+ *   - Hostname/SAN check    : verifies that the broker certificate contains the
+ *                             endpoint host as DNS or IP subject alternative name.
+ *                             Trust alone is not enough: a trusted certificate
+ *                             for a different host is still rejected.
+ *   - Custom validator      : instead of a Trust Store you can plug in your OWN
+ *                             remote-certificate validator (for example certificate
+ *                             pinning) via PlccomMqttPkiOptions. Toggle it with
+ *                             USE_CUSTOM_CERT_VALIDATOR below; when active PLCcom
+ *                             skips the PKI store and your code owns the decision.
  *
  * EXPECTED RESULT
  *   An encrypted connection is established and a message round-trips over TLS.
@@ -100,10 +109,16 @@ public final class _41_SecureConnection {
     private static final String  CLIENT_KEY_STORE_PATH = "./tls/client-keystore.p12";
     private static final char[]  CLIENT_KEY_PASSWORD   = "changeit".toCharArray();
 
-    // For a self-signed broker certificate whose name does not match "localhost"
-    // you may need to disable hostname verification for LOCAL TESTING only. Keep
-    // it enabled in production.
-    private static final boolean VERIFY_HOSTNAME = true;
+    // Custom remote-certificate validator (optional): set to true to verify the
+    // broker certificate with your OWN code (for example certificate pinning)
+    // instead of the Trust Store above. When active, PLCcom does not read the PKI
+    // store - your validator owns the entire trust decision.
+    private static final boolean USE_CUSTOM_CERT_VALIDATOR = false;
+
+    // Hostname verification is intentionally always enabled in this workshop.
+    // The broker certificate must contain the endpoint host in its SAN list.
+    // If you change BROKER_ENDPOINT to another host name or IP address, create
+    // or trust a broker certificate that contains exactly that host.
     // =========================================================================
 
     private static final String TOPIC = "plccom/workshop/41/secure";
@@ -166,16 +181,47 @@ public final class _41_SecureConnection {
         // The Trust Store lets the client verify the broker. mTLS adds a Key
         // Store so the broker can verify the client. None of this is hidden - it
         // is the visible security configuration a real application must own.
-        System.out.println("  Loading trust store from " + TRUST_STORE_PATH + " ...");
-        KeyStore trustStore = loadPkcs12(TRUST_STORE_PATH, TRUST_STORE_PASSWORD);
-
         PlccomMqttTlsOptions.Builder tls = PlccomMqttTlsOptions.builder()
-                .trustStore(trustStore)                       // verify the broker
-                .hostnameVerificationEnabled(VERIFY_HOSTNAME);
+                .hostnameVerificationEnabled(true);
+
+        if (USE_CUSTOM_CERT_VALIDATOR) {
+            // ALTERNATIVE to a Trust Store: plug in your OWN certificate check via a
+            // remote-certificate validator, supplied through PlccomMqttPkiOptions.
+            // When a validator is set, PLCcom does not read the file-based PKI store -
+            // your code owns the ENTIRE trust decision, so implement it carefully.
+            System.out.println("  Using a custom remote-certificate validator (no trust store) ...");
+            PlccomMqttPkiOptions pkiOptions = PlccomMqttPkiOptions.builder()
+                    .remoteCertificateValidator(context -> {
+                        // The broker's certificate chain is context.getRemoteCertificateChain().
+                        // A real check would pin a known fingerprint or call a service; this
+                        // demo only rejects an empty chain - NEVER accept blindly in production.
+                        if (context.getRemoteCertificateChain().isEmpty()) {
+                            return PlccomMqttRemoteCertificateValidationResult.reject("no certificate presented");
+                        }
+                        return PlccomMqttRemoteCertificateValidationResult.accept();
+                    })
+                    .build();
+            tls.pkiOptions(pkiOptions);
+        } else {
+            // DEFAULT: verify the broker against a Trust Store. A Trust Store is just
+            // a PKCS#12 (.p12) file loaded into a KeyStore; the loading is written out
+            // here because owning the PKI material is part of the security lesson.
+            System.out.println("  Loading trust store from " + TRUST_STORE_PATH + " ...");
+            KeyStore trustStore = KeyStore.getInstance("PKCS12");
+            try (InputStream trustInput = new FileInputStream(TRUST_STORE_PATH)) {
+                trustStore.load(trustInput, TRUST_STORE_PASSWORD);
+            }
+            tls.trustStore(trustStore);                       // verify the broker
+        }
 
         if (USE_MUTUAL_TLS) {
+            // For mutual TLS the client also loads its own key store (private key
+            // plus client certificate) and hands it to the TLS options.
             System.out.println("  Loading client key store for mTLS from " + CLIENT_KEY_STORE_PATH + " ...");
-            KeyStore keyStore = loadPkcs12(CLIENT_KEY_STORE_PATH, CLIENT_KEY_PASSWORD);
+            KeyStore keyStore = KeyStore.getInstance("PKCS12");
+            try (InputStream keyInput = new FileInputStream(CLIENT_KEY_STORE_PATH)) {
+                keyStore.load(keyInput, CLIENT_KEY_PASSWORD);
+            }
             tls.keyStore(keyStore, CLIENT_KEY_PASSWORD);      // let the broker verify us
         }
 
@@ -218,17 +264,11 @@ public final class _41_SecureConnection {
         }
     }
 
-    // Loads a PKCS#12 (.p12) key/trust store from a file. Kept visible in this
-    // class because loading PKI material is part of the security lesson.
-    private static KeyStore loadPkcs12(String path, char[] password) throws Exception {
-        KeyStore store = KeyStore.getInstance("PKCS12");
-        try (InputStream input = new FileInputStream(path)) {
-            store.load(input, password);
-        }
-        return store;
-    }
-
+    // Small private helper, kept inside this same workshop class on purpose: it
+    // only resolves the broker endpoint (constant, or an optional system-property
+    // override for automation). It carries no MQTT learning logic.
     private static String brokerEndpoint() {
         return System.getProperty("plccom.mqtt.workshop.endpoint", BROKER_ENDPOINT);
     }
 }
+

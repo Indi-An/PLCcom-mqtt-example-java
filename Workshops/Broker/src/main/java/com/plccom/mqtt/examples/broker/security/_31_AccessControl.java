@@ -134,7 +134,7 @@ public final class _31_AccessControl {
         // WARNING keeps the log quiet but still shows access denials.
         WorkshopAccessValidator validator = new WorkshopAccessValidator();
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .tcpPort(0)
+                .tcpPort(1883) // 1883 is the standard MQTT-over-TCP port
                 .accessValidator(validator)
                 .diagnosticLevel(PlccomMqttDiagnosticLevel.WARNING)
                 .onDiagnostic(event -> System.out.println("    [diagnostic] " + event.getSeverity()

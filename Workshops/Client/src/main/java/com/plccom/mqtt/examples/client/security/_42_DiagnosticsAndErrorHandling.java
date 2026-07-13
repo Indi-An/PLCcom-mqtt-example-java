@@ -28,7 +28,6 @@ import com.plccom.mqtt.client.MqttPublishResult;
 import com.plccom.mqtt.client.PlccomMqttClient;
 import com.plccom.mqtt.client.PlccomMqttClientFactory;
 import com.plccom.mqtt.client.PlccomMqttConnectResult;
-import com.plccom.mqtt.diagnostics.PlccomMqttDiagnosticEvent;
 import com.plccom.mqtt.diagnostics.PlccomMqttDiagnosticLevel;
 
 /**
@@ -151,7 +150,13 @@ public final class _42_DiagnosticsAndErrorHandling {
                 .diagnosticLevel(PlccomMqttDiagnosticLevel.WARNING)
                 .onDiagnostic(event -> {
                     diagnosticCount.incrementAndGet();
-                    printDiagnostic(event);
+                    // An application would forward this to its logger, monitoring
+                    // system or UI; here we just print the structured fields
+                    // (severity, category, code, message) right in the callback.
+                    System.out.println("    [diagnostic] " + event.getSeverity()
+                            + " " + event.getCategory()
+                            + " " + event.getCode()
+                            + " : " + event.getMessage());
                 })
                 .build();
 
@@ -219,15 +224,9 @@ public final class _42_DiagnosticsAndErrorHandling {
         }
     }
 
-    // Prints one diagnostic event. An application would instead forward this to
-    // its logger, monitoring system or user interface.
-    private static void printDiagnostic(PlccomMqttDiagnosticEvent event) {
-        System.out.println("    [diagnostic] " + event.getSeverity()
-                + " " + event.getCategory()
-                + " " + event.getCode()
-                + " : " + event.getMessage());
-    }
-
+    // Small private helper, kept inside this same workshop class on purpose: it
+    // only resolves the broker endpoint (constant, or an optional system-property
+    // override for automation). It carries no MQTT learning logic.
     private static String brokerEndpoint() {
         return System.getProperty("plccom.mqtt.workshop.endpoint", BROKER_ENDPOINT);
     }

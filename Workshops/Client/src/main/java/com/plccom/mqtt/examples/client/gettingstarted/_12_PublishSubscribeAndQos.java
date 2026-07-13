@@ -189,13 +189,39 @@ public final class _12_PublishSubscribeAndQos {
 
             // -- Step 3: publish three messages at QoS 0, 1 and 2 -------------
             // Each message goes to a different Topic Name, but all of them match
-            // the single wildcard filter above. Note how the QoS is a property of
-            // the publish, chosen per message to fit its reliability needs.
+            // the single wildcard filter above. The QoS is a property of the
+            // publish, chosen per message to fit its reliability needs - so the
+            // three publishes are written out here in full, each with its explicit
+            // .qos0() / .qos1() / .qos2() and its result quality checked in place.
             System.out.println();
             System.out.println("  Publishing three messages with different QoS levels:");
-            publishAtQos(client, "plccom/workshop/12/sensor/temperature", "21.4 degC", 0);
-            publishAtQos(client, "plccom/workshop/12/sensor/humidity", "48 %", 1);
-            publishAtQos(client, "plccom/workshop/12/command/restart", "restart-now", 2);
+
+            MqttPublishResult qos0Result = client.publish("plccom/workshop/12/sensor/temperature", "21.4 degC")
+                    .qos0()   // at most once - fire and forget
+                    .send();
+            if (!qos0Result.isGood()) {
+                throw new IllegalStateException("PUBLISH (QoS 0) failed: "
+                        + qos0Result.getQuality() + " - " + qos0Result.getMessage());
+            }
+            System.out.println("    published QoS 0 to Topic Name plccom/workshop/12/sensor/temperature");
+
+            MqttPublishResult qos1Result = client.publish("plccom/workshop/12/sensor/humidity", "48 %")
+                    .qos1()   // at least once - guaranteed, duplicates possible
+                    .send();
+            if (!qos1Result.isGood()) {
+                throw new IllegalStateException("PUBLISH (QoS 1) failed: "
+                        + qos1Result.getQuality() + " - " + qos1Result.getMessage());
+            }
+            System.out.println("    published QoS 1 to Topic Name plccom/workshop/12/sensor/humidity");
+
+            MqttPublishResult qos2Result = client.publish("plccom/workshop/12/command/restart", "restart-now")
+                    .qos2()   // exactly once - guaranteed, no duplicates
+                    .send();
+            if (!qos2Result.isGood()) {
+                throw new IllegalStateException("PUBLISH (QoS 2) failed: "
+                        + qos2Result.getQuality() + " - " + qos2Result.getMessage());
+            }
+            System.out.println("    published QoS 2 to Topic Name plccom/workshop/12/command/restart");
 
             // -- Step 4: receive all three through the one subscription --------
             // Because all three Topic Names match "plccom/workshop/12/#", the same
@@ -230,32 +256,6 @@ public final class _12_PublishSubscribeAndQos {
             // -- Step 5: clean shutdown ---------------------------------------
             client.close();
         }
-    }
-
-    // Small private helper, kept inside this same workshop class on purpose: it
-    // only removes the repetition of the three publish calls and prints what it
-    // sends. The actual MQTT action (publish at a chosen QoS) stays fully visible.
-    private static void publishAtQos(PlccomMqttClient client, String topicName, String payload, int qos)
-            throws Exception {
-        MqttPublishResult result;
-        switch (qos) {
-            case 0:
-                result = client.publish(topicName, payload).qos0().send();
-                break;
-            case 1:
-                result = client.publish(topicName, payload).qos1().send();
-                break;
-            case 2:
-                result = client.publish(topicName, payload).qos2().send();
-                break;
-            default:
-                throw new IllegalArgumentException("QoS must be 0, 1 or 2 but was " + qos);
-        }
-        if (!result.isGood()) {
-            throw new IllegalStateException("PUBLISH (QoS " + qos + ") failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-        System.out.println("    published QoS " + qos + " to Topic Name " + topicName);
     }
 
     // Resolves the broker endpoint: the visible constant, or an optional

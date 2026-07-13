@@ -59,7 +59,8 @@ import com.plccom.mqtt.client.PlccomMqttPublishMessage;
  *                            connection closes.
  *   - Offline queue        : QoS 1/2 messages the broker stores for a persistent
  *                            session while the client is disconnected.
- *   - Lifecycle callbacks  : onConnected / onDisconnected notifications.
+ *   - Lifecycle callbacks  : onConnected / onDisconnected notifications, plus
+ *                            onReconnectFailed when automatic reconnect gives up.
  *   - Automatic reconnect  : the client re-establishes a lost connection using a
  *                            bounded backoff (automaticReconnect()).
  *
@@ -144,7 +145,26 @@ public final class _31_SessionsReconnectAndLifecycle {
         // automaticReconnect() is enabled to show how it is configured (it would
         // silently re-establish the connection if the network dropped).
         System.out.println("  Opening a persistent session (cleanStart=false, sessionExpiry=60s) ...");
-        PlccomMqttClient first = persistentClient();
+        // The session settings that matter are written out in full here:
+        // cleanStart(false) plus a Session Expiry keep the session, automaticReconnect()
+        // would retry a lost connection, and the lifecycle callbacks print state changes.
+        PlccomMqttClient first = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier(SESSION_CLIENT_ID)
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .cleanStart(false)                       // keep/resume the session
+                .sessionExpirySeconds(Long.valueOf(60))  // survive up to 60 s offline
+                .automaticReconnect()                    // retry a lost connection
+                .keepAliveSeconds(30)
+                .onConnected(context -> System.out.println("    [lifecycle] connected"))
+                .onDisconnected(context -> System.out.println("    [lifecycle] disconnected"))
+                .onReconnectFailed(context -> System.out.println("    [lifecycle] automatic reconnect finally gave up"))
+                .build();
+        PlccomMqttConnectResult firstConnect = first.connect();
+        if (!firstConnect.isGood()) {
+            throw new IllegalStateException("CONNECT (first session) failed: "
+                    + firstConnect.getQuality() + " - " + firstConnect.getMessage());
+        }
         first.subscribe(TOPIC).qos1().send();
         System.out.println("  Subscribed. Now disconnecting to simulate going offline ...");
         // A clean disconnect keeps the session (it does not delete it); the broker
@@ -161,7 +181,11 @@ public final class _31_SessionsReconnectAndLifecycle {
                 .mqtt5()
                 .keepAliveSeconds(30)
                 .build();
-        requireGoodConnect(publisher.connect());
+        PlccomMqttConnectResult publisherConnect = publisher.connect();
+        if (!publisherConnect.isGood()) {
+            throw new IllegalStateException("CONNECT (publisher) failed: "
+                    + publisherConnect.getQuality() + " - " + publisherConnect.getMessage());
+        }
         publisher.publish(TOPIC, "queued while the subscriber was offline")
                 .qos1()
                 .payloadFormatUtf8()
@@ -171,7 +195,25 @@ public final class _31_SessionsReconnectAndLifecycle {
         // -- Step 3: reconnect with the SAME client id and drain the queue ----
         System.out.println();
         System.out.println("  Reconnecting with the same Client Identifier to resume the session ...");
-        PlccomMqttClient second = persistentClient();
+        // Same builder as the first connection - reconnecting with the SAME
+        // Client Identifier and cleanStart(false) is what resumes the session.
+        PlccomMqttClient second = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier(SESSION_CLIENT_ID)
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .cleanStart(false)
+                .sessionExpirySeconds(Long.valueOf(60))
+                .automaticReconnect()
+                .keepAliveSeconds(30)
+                .onConnected(context -> System.out.println("    [lifecycle] connected"))
+                .onDisconnected(context -> System.out.println("    [lifecycle] disconnected"))
+                .onReconnectFailed(context -> System.out.println("    [lifecycle] automatic reconnect finally gave up"))
+                .build();
+        PlccomMqttConnectResult secondConnect = second.connect();
+        if (!secondConnect.isGood()) {
+            throw new IllegalStateException("CONNECT (resumed session) failed: "
+                    + secondConnect.getQuality() + " - " + secondConnect.getMessage());
+        }
         try {
             PlccomMqttPublishMessage queued = second.receive(3000);
             if (queued == null) {
@@ -185,32 +227,9 @@ public final class _31_SessionsReconnectAndLifecycle {
         }
     }
 
-    // Builds and connects a persistent-session client with lifecycle callbacks.
-    // Kept in this class so the important session settings stay visible; it only
-    // removes the repetition of building the same client twice.
-    private static PlccomMqttClient persistentClient() throws Exception {
-        PlccomMqttClient client = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .identifier(SESSION_CLIENT_ID)
-                .endpoint(brokerEndpoint())
-                .mqtt5()
-                .cleanStart(false)                       // keep/resume the session
-                .sessionExpirySeconds(Long.valueOf(60))  // survive up to 60 s offline
-                .automaticReconnect()                    // retry a lost connection
-                .keepAliveSeconds(30)
-                .onConnected(context -> System.out.println("    [lifecycle] connected"))
-                .onDisconnected(context -> System.out.println("    [lifecycle] disconnected"))
-                .build();
-        requireGoodConnect(client.connect());
-        return client;
-    }
-
-    private static void requireGoodConnect(PlccomMqttConnectResult result) {
-        if (!result.isGood()) {
-            throw new IllegalStateException("CONNECT failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-    }
-
+    // Small private helper, kept inside this same workshop class on purpose: it
+    // only resolves the broker endpoint (constant, or an optional system-property
+    // override for automation). It carries no MQTT learning logic.
     private static String brokerEndpoint() {
         return System.getProperty("plccom.mqtt.workshop.endpoint", BROKER_ENDPOINT);
     }

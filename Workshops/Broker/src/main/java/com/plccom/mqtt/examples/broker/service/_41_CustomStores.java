@@ -131,7 +131,12 @@ public final class _41_CustomStores {
 
         // -- Step 1: first broker saves a retained message via the store ------
         System.out.println("  Starting broker #1 with the custom store ...");
-        PlccomMqttBroker firstBroker = brokerWithStore(store);
+        // store(store) is the key call: it tells the broker to persist and load
+        // its state through your PlccomMqttBrokerStore instead of memory.
+        PlccomMqttBroker firstBroker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .tcpPort(1883) // standard MQTT-over-TCP port (both brokers run sequentially, so it is reused)
+                .store(store)
+                .start();
         try {
             System.out.println("  Publishing a retained message (this calls the store) ...");
             firstBroker.publish(RETAINED_TOPIC, "state saved by the custom store")
@@ -149,7 +154,12 @@ public final class _41_CustomStores {
         // clients, so the retained value is available again immediately.
         System.out.println();
         System.out.println("  Starting broker #2 with the SAME store (simulating a restart) ...");
-        PlccomMqttBroker secondBroker = brokerWithStore(store);
+        // Same builder, same store instance - on startup the broker calls
+        // loadRetainedMessages() on it before accepting clients.
+        PlccomMqttBroker secondBroker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .tcpPort(1883) // standard MQTT-over-TCP port (both brokers run sequentially, so it is reused)
+                .store(store)
+                .start();
         try {
             int recovered = secondBroker.admin().snapshot().getRetainedMessages().size();
             System.out.println("  Retained messages recovered after restart: " + recovered);
@@ -161,13 +171,6 @@ public final class _41_CustomStores {
         } finally {
             secondBroker.close();
         }
-    }
-
-    private static PlccomMqttBroker brokerWithStore(WorkshopStateStore store) throws Exception {
-        return PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .tcpPort(0)
-                .store(store)
-                .start();
     }
 
     /**

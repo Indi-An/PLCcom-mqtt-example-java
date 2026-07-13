@@ -22,6 +22,7 @@
 package com.plccom.mqtt.examples.broker.basics;
 
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 import com.plccom.console.PLCcomConsole;
 import com.plccom.mqtt.broker.PlccomMqttBroker;
@@ -54,8 +55,18 @@ import com.plccom.mqtt.pki.PlccomMqttOwnCertificate;
  *   - Server certificate   : the broker's TLS identity. Production uses the
  *                            company PKI; this workshop auto-creates a self-signed
  *                            certificate in ./pki via PlccomMqttOwnCertificate.
+ *                            The certificate must contain the listener host as
+ *                            DNS/IP SAN; otherwise strict clients reject it.
  *   - Per-port certificate : a certificate can be assigned to a specific port
  *                            with assignTlsCertificateToPort(...) (see comments).
+ *   - Client certificates  : each TLS/WSS listener carries its own
+ *                            clientCertificateMode(...) in its TLS options:
+ *                            NONE never requests a client certificate, OPTIONAL
+ *                            requests one but accepts connections without it
+ *                            (the access validator can then deny at CONNECT with
+ *                            reason 0x87), REQUIRED aborts the TLS handshake
+ *                            without one (strict mTLS). One broker can expose
+ *                            an OPTIONAL and a REQUIRED port side by side.
  *
  * EXPECTED RESULT
  *   The broker starts a plain TCP, a TLS and a secure WebSocket listener and
@@ -71,6 +82,12 @@ public final class _13_SecureListeners {
     // =========================================================================
 
     private static final String BIND_ADDRESS = "127.0.0.1";
+
+    // Standard MQTT ports (plain 1883, TLS 8883, secure WebSocket 8443). If one is
+    // already in use locally, stop the other broker or change the value.
+    private static final int TCP_PORT = 1883; // plain TCP        (mqtt)
+    private static final int TLS_PORT = 8883; // TLS              (mqtts)
+    private static final int WSS_PORT = 8443; // secure WebSocket (wss)
 
     // Where the auto-created server certificate is stored. On the first run the
     // certificate and key are generated here; later runs reuse them.
@@ -131,18 +148,21 @@ public final class _13_SecureListeners {
         System.out.println("  Preparing the broker server certificate in " + PKI_FOLDER + " ...");
         PlccomMqttOwnCertificate serverCertificate = new PlccomMqttOwnCertificate(
                 Paths.get(PKI_FOLDER), CERT_ALIAS, CERT_PASSWORD, CERT_VALID_DAYS);
+        serverCertificate.loadOrCreateForServerHosts(Arrays.asList(BIND_ADDRESS));
 
         // -- Step 2: start plain, TLS and secure WebSocket listeners ----------
         // defaultTlsCertificate(...) supplies the identity for the TLS-based
         // listeners. The 2-argument tlsListener / secureWebSocketListener then
-        // resolve their certificate from that default. To give a specific port
-        // its own certificate instead, use assignTlsCertificateToPort(port, cert).
+        // resolve their certificate from that default. The certificate was
+        // prepared above with BIND_ADDRESS as SAN so strict clients can verify
+        // both trust and endpoint identity. To give a specific port its own
+        // certificate instead, use assignTlsCertificateToPort(port, cert).
         System.out.println("  Starting plain TCP, TLS and secure WebSocket listeners ...");
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
                 .defaultTlsCertificate(serverCertificate)
-                .tcpListener(BIND_ADDRESS, 0)             // plain TCP (migration)
-                .tlsListener(BIND_ADDRESS, 0)             // mqtts:// (uses default cert)
-                .secureWebSocketListener(BIND_ADDRESS, 0) // wss:// (uses default cert)
+                .tcpListener(BIND_ADDRESS, TCP_PORT)             // plain TCP (migration)
+                .tlsListener(BIND_ADDRESS, TLS_PORT)             // mqtts:// (uses default cert)
+                .secureWebSocketListener(BIND_ADDRESS, WSS_PORT) // wss:// (uses default cert)
                 .start();
 
         try {
@@ -162,3 +182,4 @@ public final class _13_SecureListeners {
         }
     }
 }
+

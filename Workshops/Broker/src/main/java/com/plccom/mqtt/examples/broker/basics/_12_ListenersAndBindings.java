@@ -68,6 +68,12 @@ public final class _12_ListenersAndBindings {
     // 0.0.0.0) once authentication is configured for a networked deployment.
     private static final String BIND_ADDRESS = "127.0.0.1";
 
+    // Standard MQTT ports. A second TCP listener cannot reuse 1883, so it takes the
+    // adjacent 1884. If a port is already in use locally, stop the other broker.
+    private static final int TCP_PORT_1 = 1883; // first plain TCP listener  (standard)
+    private static final int TCP_PORT_2 = 1884; // second plain TCP listener (1883 is taken)
+    private static final int WS_PORT    = 8080; // WebSocket listener
+
     private _12_ListenersAndBindings() {
     }
 
@@ -119,9 +125,9 @@ public final class _12_ListenersAndBindings {
         // message published on one listener is visible to subscribers on another.
         System.out.println("  Starting one broker with two TCP listeners and one WebSocket listener ...");
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .tcpListener(BIND_ADDRESS, 0)       // first TCP entry point
-                .addTcpListener(BIND_ADDRESS, 0)    // second TCP entry point
-                .webSocketListener(BIND_ADDRESS, 0) // WebSocket entry point
+                .tcpListener(BIND_ADDRESS, TCP_PORT_1)    // first TCP entry point
+                .addTcpListener(BIND_ADDRESS, TCP_PORT_2) // second TCP entry point
+                .webSocketListener(BIND_ADDRESS, WS_PORT) // WebSocket entry point
                 .start();
 
         try {

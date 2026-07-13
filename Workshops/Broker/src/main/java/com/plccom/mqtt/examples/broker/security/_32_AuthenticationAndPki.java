@@ -56,8 +56,9 @@ import com.plccom.mqtt.broker.PlccomMqttBrokerSubscriptionContext;
  *   custom identity systems use enhanced authentication tokens.
  *
  * MATCHING CLIENT
- *   Client Workshop 41 (Secure Connection) shows the client side of TLS and mTLS.
- *   This workshop stays broker-only.
+ *   Client Workshop 41 (Secure Connection) shows the client side of TLS and mTLS;
+ *   Client Workshop 43 (Enhanced Authentication) shows the client side of the
+ *   enhanced-authentication method installed here.
  *
  * MQTT TERMS USED HERE
  *   - Username/password      : credentials in CONNECT, checked by the validator.
@@ -135,7 +136,7 @@ public final class _32_AuthenticationAndPki {
         WorkshopPasswordValidator passwords = new WorkshopPasswordValidator();
         WorkshopTokenAuthenticator tokens = new WorkshopTokenAuthenticator();
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .tcpPort(0)
+                .tcpPort(1883) // 1883 is the standard MQTT-over-TCP port
                 .accessValidator(passwords)
                 .enhancedAuthenticator(tokens)
                 .start();

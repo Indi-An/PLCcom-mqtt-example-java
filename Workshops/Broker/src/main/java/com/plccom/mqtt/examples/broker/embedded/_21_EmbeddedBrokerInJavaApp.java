@@ -124,7 +124,7 @@ public final class _21_EmbeddedBrokerInJavaApp {
         // -- Step 1: the application owns the broker --------------------------
         System.out.println("  Starting the embedded broker (owned by this application) ...");
         PlccomMqttBroker broker = PlccomMqttBrokerFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .tcpPort(0)
+                .tcpPort(1883) // 1883 is the standard MQTT-over-TCP port
                 .start();
 
         MqttBrokerListenerHandle commandListener = null;

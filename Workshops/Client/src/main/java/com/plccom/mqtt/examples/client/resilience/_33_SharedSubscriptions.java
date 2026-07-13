@@ -23,6 +23,8 @@ package com.plccom.mqtt.examples.client.resilience;
 
 import com.plccom.console.PLCcomConsole;
 import com.plccom.mqtt.client.MqttMessage;
+import com.plccom.mqtt.client.MqttPublishResult;
+import com.plccom.mqtt.client.MqttSubscribeResult;
 import com.plccom.mqtt.client.PlccomMqttClient;
 import com.plccom.mqtt.client.PlccomMqttClientFactory;
 import com.plccom.mqtt.client.PlccomMqttConnectResult;
@@ -56,6 +58,11 @@ import com.plccom.mqtt.client.PlccomMqttPublishMessage;
  *                           The part after the group name is the normal filter.
  *   - Consumer group      : all clients that subscribe with the same share name;
  *                           the broker distributes messages among them.
+ *
+ * HOW THIS WORKSHOP IS WRITTEN
+ *   Both workers and the publisher are built and connected inline in start(), and
+ *   every CONNECT / SUBSCRIBE / PUBLISH result is checked in place. Nothing is
+ *   hidden in a helper method.
  *
  * EXPECTED RESULT
  *   A batch of jobs published to the shared topic is distributed across two
@@ -128,24 +135,73 @@ public final class _33_SharedSubscriptions {
         System.out.println("  Broker endpoint : " + brokerEndpoint());
         System.out.println();
 
-        PlccomMqttClient workerA = connectedClient("plccom-workshop-33-worker-a");
-        PlccomMqttClient workerB = connectedClient("plccom-workshop-33-worker-b");
-        PlccomMqttClient publisher = connectedClient("plccom-workshop-33-publisher");
+        // Two workers and one publisher, each built and connected inline. All three
+        // are ordinary MQTT 5 clients; the CONNECT result is checked for each.
+        PlccomMqttClient workerA = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-33-worker-a")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        PlccomMqttClient workerB = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-33-worker-b")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
+        PlccomMqttClient publisher = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
+                .identifier("plccom-workshop-33-publisher")
+                .endpoint(brokerEndpoint())
+                .mqtt5()
+                .keepAliveSeconds(30)
+                .build();
         try {
+            PlccomMqttConnectResult connectA = workerA.connect();
+            if (!connectA.isGood()) {
+                throw new IllegalStateException("CONNECT (worker A) failed: "
+                        + connectA.getQuality() + " - " + connectA.getMessage());
+            }
+            PlccomMqttConnectResult connectB = workerB.connect();
+            if (!connectB.isGood()) {
+                throw new IllegalStateException("CONNECT (worker B) failed: "
+                        + connectB.getQuality() + " - " + connectB.getMessage());
+            }
+            PlccomMqttConnectResult connectPublisher = publisher.connect();
+            if (!connectPublisher.isGood()) {
+                throw new IllegalStateException("CONNECT (publisher) failed: "
+                        + connectPublisher.getQuality() + " - " + connectPublisher.getMessage());
+            }
+
             // -- Step 1: both workers join the SAME shared group --------------
             // sharedSubscription(SHARE_NAME) turns the plain filter into
             // "$share/plccom-workers/plccom/workshop/33/jobs". Both workers use
             // the same share name, so they form one consumer group.
             System.out.println("  Two workers join shared group '" + SHARE_NAME + "' on " + JOB_TOPIC);
-            workerA.subscribe(JOB_TOPIC).sharedSubscription(SHARE_NAME).qos1().send();
-            workerB.subscribe(JOB_TOPIC).sharedSubscription(SHARE_NAME).qos1().send();
+            MqttSubscribeResult subscribeA = workerA.subscribe(JOB_TOPIC).sharedSubscription(SHARE_NAME).qos1().send();
+            if (!subscribeA.isGood()) {
+                throw new IllegalStateException("SUBSCRIBE (worker A) failed: "
+                        + subscribeA.getQuality() + " - " + subscribeA.getMessage());
+            }
+            MqttSubscribeResult subscribeB = workerB.subscribe(JOB_TOPIC).sharedSubscription(SHARE_NAME).qos1().send();
+            if (!subscribeB.isGood()) {
+                throw new IllegalStateException("SUBSCRIBE (worker B) failed: "
+                        + subscribeB.getQuality() + " - " + subscribeB.getMessage());
+            }
 
             // -- Step 2: publish a batch of jobs ------------------------------
             // The publisher uses the PLAIN topic (never the $share prefix). The
-            // broker spreads these jobs across the group members.
+            // broker spreads these jobs across the group members. Each publish
+            // result is checked so a failure is visible immediately.
             System.out.println("  Publishing " + JOB_COUNT + " jobs ...");
             for (int i = 1; i <= JOB_COUNT; i++) {
-                publisher.publish(JOB_TOPIC, "job-" + i).qos1().payloadFormatUtf8().send();
+                MqttPublishResult jobPublish = publisher.publish(JOB_TOPIC, "job-" + i)
+                        .qos1()
+                        .payloadFormatUtf8()
+                        .send();
+                if (!jobPublish.isGood()) {
+                    throw new IllegalStateException("PUBLISH (job-" + i + ") failed: "
+                            + jobPublish.getQuality() + " - " + jobPublish.getMessage());
+                }
             }
 
             // -- Step 3: drain both workers and count the distribution --------
@@ -186,21 +242,9 @@ public final class _33_SharedSubscriptions {
         }
     }
 
-    private static PlccomMqttClient connectedClient(String clientId) throws Exception {
-        PlccomMqttClient client = PlccomMqttClientFactory.builder(LICENSE_USER, LICENSE_SERIAL)
-                .identifier(clientId)
-                .endpoint(brokerEndpoint())
-                .mqtt5()
-                .keepAliveSeconds(30)
-                .build();
-        PlccomMqttConnectResult result = client.connect();
-        if (!result.isGood()) {
-            throw new IllegalStateException("CONNECT failed: "
-                    + result.getQuality() + " - " + result.getMessage());
-        }
-        return client;
-    }
-
+    // Small private helper, kept inside this same workshop class on purpose: it
+    // only resolves the broker endpoint (constant, or an optional system-property
+    // override for automation). It carries no MQTT learning logic.
     private static String brokerEndpoint() {
         return System.getProperty("plccom.mqtt.workshop.endpoint", BROKER_ENDPOINT);
     }
