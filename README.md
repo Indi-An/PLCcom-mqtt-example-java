@@ -22,6 +22,40 @@ This repository is a **practical learning path** that answers those questions wi
 
 Everything here uses the **high-level PLCcom MQTT API** only — the comfortable Client and Broker surface, not the wire protocol.
 
+## ✨ Capabilities at a Glance
+
+Nothing on this list is just a claim — every capability is demonstrated by a runnable workshop in this repository (the workshop maps below show exactly which one).
+
+**Protocol & Messaging**
+
+- MQTT **3.1.1** and **5.0** over `mqtt://`, `mqtts://`, `ws://` and `wss://`
+- QoS **0 / 1 / 2** and topic wildcards (`+`, `#`)
+- **Retained messages** including retained deletion
+- **Last Will** — fired on an ungraceful drop, suppressed by a clean disconnect
+- All **MQTT 5 message properties**: content type, payload format, user properties, message expiry, response topic, correlation data and **topic alias**
+- **MQTT 5 subscription options**: subscription identifiers, no local, retain as published, retain handling
+- **Request / response** as one high-level call, and **JSON mapping** (publish a Java object, read it back as the same type)
+
+**Client**
+
+- Persistent **sessions** with offline queueing and session expiry
+- **Automatic reconnect** with lifecycle callbacks (connected / disconnected / reconnect failed)
+- **Async API** (`CompletableFuture`) alongside the blocking API
+- **Shared subscriptions** to load-balance a topic across workers
+- **TLS / mTLS / WSS** with trust and key stores, hostname verification and an optional custom remote-certificate validator
+- **MQTT 5 enhanced authentication** (application-owned challenge/response)
+- Structured **diagnostics** with level filtering — and every call returns a checkable **OperationResult/Quality**
+
+**Broker**
+
+- Runs **standalone or embedded** inside your Java application
+- Multiple **listeners side by side**: TCP, WebSocket, TLS and secure WebSocket — with **per-port server certificates**
+- **In-process publish and listen** — exchange data with connected clients without a network client
+- **Access control** (application-owned validator for CONNECT / PUBLISH / SUBSCRIBE) and **enhanced authentication**
+- **PKI store** for certificate management (own / trusted / issuers / rejected)
+- **Custom state stores** — keep retained messages and sessions in your own durable storage
+- **Admin snapshots** and statistics, plus structured diagnostics
+
 ## 🧭 What You Will Find Here
 
 | Area | What it teaches | Typical use |
