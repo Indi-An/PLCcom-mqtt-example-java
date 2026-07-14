@@ -21,6 +21,10 @@
 
 package com.plccom.mqtt.examples.client.mqtt5;
 
+import java.nio.charset.StandardCharsets;
+
+import com.google.gson.Gson;
+
 import com.plccom.console.PLCcomConsole;
 import com.plccom.mqtt.client.MqttMessage;
 import com.plccom.mqtt.client.MqttPublishResult;
@@ -30,20 +34,23 @@ import com.plccom.mqtt.client.PlccomMqttConnectResult;
 import com.plccom.mqtt.client.PlccomMqttPublishMessage;
 
 /**
- * Workshop 24 - JSON Mapping (MQTT 5)
+ * Workshop 24 - JSON payloads over MQTT (MQTT 5)
  *
  * WHAT THIS WORKSHOP SHOWS
  *   How to send a Java object as a JSON payload and read it back as the same
- *   type. MQTT itself only transports bytes; publishJson(...) serializes an
- *   object to UTF-8 JSON and marks it as application/json, and payloadAsJson(...)
- *   turns the received payload back into a Java object. Topic, QoS and MQTT 5
- *   metadata stay fully visible - only the payload conversion is done for you.
+ *   type. MQTT itself only transports bytes, so the SDK deliberately stays free
+ *   of any JSON dependency: you pick the JSON library you like and serialize the
+ *   object yourself. This workshop uses Gson as one popular example. On publish
+ *   you turn the object into UTF-8 JSON bytes and mark the message with Content
+ *   Type application/json; on receive you read the bytes back and deserialize
+ *   them. Topic, QoS and MQTT 5 metadata stay fully in your hands.
  *
  * WHEN YOU NEED THIS IN REAL APPLICATIONS
  *   Almost every real application sends structured data (a measurement record, a
  *   command with parameters, a status object). JSON keeps that data readable and
- *   interoperable with any MQTT peer, while this convenience keeps the Java side
- *   free of manual serialization boilerplate.
+ *   interoperable with any MQTT peer. Because JSON handling lives in your own
+ *   code, you stay free to use Gson, Jackson, or whatever your project already
+ *   depends on - the PLCcom MQTT libraries add no JSON dependency of their own.
  *
  * BROKER FOR THIS WORKSHOP
  *   This client workshop needs a running MQTT 5 broker. Start Broker Workshop 11
@@ -55,8 +62,8 @@ import com.plccom.mqtt.client.PlccomMqttPublishMessage;
  * MQTT TERMS USED HERE
  *   - JSON payload  : the message body is JSON text; MQTT does not care about the
  *                     format, it only carries the bytes.
- *   - Content Type  : publishJson(...) sets application/json so any receiver can
- *                     recognize the format without parsing the topic name.
+ *   - Content Type  : we set application/json so any receiver can recognize the
+ *                     format without parsing the topic name.
  *   - Payload Format: the payload is marked as UTF-8 text.
  *
  * EXPECTED RESULT
@@ -79,6 +86,11 @@ public final class _24_JsonMapping {
     // =========================================================================
 
     private static final String TOPIC = "plccom/workshop/24/motor-state";
+    private static final String APPLICATION_JSON = "application/json";
+
+    // The JSON library of your choice. The SDK does not depend on it; this
+    // example brings its own Gson, exactly like a real application would.
+    private static final Gson JSON = new Gson();
 
     private _24_JsonMapping() {
     }
@@ -112,14 +124,14 @@ public final class _24_JsonMapping {
         System.out.println("╔════════════════════════════════════════════════════════════════════════════╗");
         System.out.println("║  What this workshop demonstrates                                           ║");
         System.out.println("║                                                                            ║");
-        System.out.println("║  JSON mapping - a convenience for sending Java objects as JSON payloads.   ║");
+        System.out.println("║  Sending Java objects as JSON payloads over MQTT.                          ║");
         System.out.println("║                                                                            ║");
-        System.out.println("║  MQTT itself only transports bytes. publishJson(...) serializes a Java     ║");
-        System.out.println("║  object to UTF-8 JSON and marks it as application/json; the receiver turns ║");
-        System.out.println("║  the payload back into the same type with payloadAsJson(...).              ║");
+        System.out.println("║  MQTT itself only transports bytes, so the SDK stays JSON-free. You pick   ║");
+        System.out.println("║  a JSON library (here Gson), serialize the object to UTF-8 JSON bytes and  ║");
+        System.out.println("║  publish them with Content Type application/json; the receiver reads the   ║");
+        System.out.println("║  bytes back and deserializes them with the same library.                  ║");
         System.out.println("║                                                                            ║");
-        System.out.println("║  The topic, QoS and MQTT 5 metadata stay fully visible - only the payload  ║");
-        System.out.println("║  conversion is done for you.                                               ║");
+        System.out.println("║  The topic, QoS and MQTT 5 metadata stay fully in your hands.              ║");
         System.out.println("║                                                                            ║");
         System.out.println("║  Expected result: the object that is published arrives as an equal object. ║");
         System.out.println("╚════════════════════════════════════════════════════════════════════════════╝");
@@ -145,24 +157,31 @@ public final class _24_JsonMapping {
             client.subscribe(TOPIC).qos1().send();
 
             // -- Step 2: publish a Java object as JSON ------------------------
-            // publishJson(...) serializes the object with the built-in JSON mapper
-            // and sets Content Type application/json for us. No manual toString or
-            // byte handling is needed.
+            // Serialize the object with your JSON library, then publish the bytes
+            // with the normal publish builder. We mark the payload as UTF-8 text
+            // and set Content Type application/json so any receiver recognizes it.
             MotorState sent = new MotorState("Motor A", true, 1480);
+            byte[] jsonBytes = JSON.toJson(sent).getBytes(StandardCharsets.UTF_8);
             System.out.println("  Publishing object as JSON: " + sent);
-            MqttPublishResult publishResult = client.publishJson(TOPIC, sent).qos1().send();
+            MqttPublishResult publishResult = client.publish(TOPIC, jsonBytes)
+                    .payloadFormatUtf8()
+                    .contentType(APPLICATION_JSON)
+                    .qos1()
+                    .send();
             if (!publishResult.isGood()) {
                 throw new IllegalStateException("PUBLISH failed: "
                         + publishResult.getQuality() + " - " + publishResult.getMessage());
             }
 
             // -- Step 3: receive and deserialize back into the same type ------
+            // The SDK hands you the raw payload; you deserialize it with the same
+            // JSON library you used to publish.
             PlccomMqttPublishMessage received = client.receive(3000);
             if (received == null) {
                 throw new IllegalStateException("The JSON message was not received in time.");
             }
             MqttMessage message = new MqttMessage(received);
-            MotorState back = message.payloadAsJson(MotorState.class);
+            MotorState back = JSON.fromJson(message.payloadAsString(), MotorState.class);
 
             System.out.println();
             System.out.println("    content type  : " + message.contentType());

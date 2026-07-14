@@ -23,13 +23,21 @@
         <dependency>
             <groupId>com.indi-an.plccom</groupId>
             <artifactId>plccom-mqtt-client</artifactId>
-            <version>2.1.2</version>
+            <version>2.1.3</version>
         </dependency>
         <!-- Shared workshop console (built by the PLCcom.Console module). -->
         <dependency>
             <groupId>com.indi-an.plccom</groupId>
             <artifactId>plccom-console</artifactId>
             <version>1.0.0</version>
+        </dependency>
+        <!-- Workshop 24 shows how to send/receive JSON with a JSON library of
+             your choice. The PLCcom MQTT SDK transports bytes and has no JSON
+             dependency; this example brings its own Gson. -->
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>2.13.2</version>
         </dependency>
     </dependencies>
 
