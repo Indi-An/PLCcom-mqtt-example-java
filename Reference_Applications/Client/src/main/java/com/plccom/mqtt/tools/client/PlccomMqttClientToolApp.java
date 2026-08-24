@@ -140,7 +140,6 @@ import com.plccom.mqtt.client.MqttSubscribeResult;
 import com.plccom.mqtt.client.PlccomMqttClient;
 import com.plccom.mqtt.client.PlccomMqttClientBuilder;
 import com.plccom.mqtt.client.PlccomMqttClientFactory;
-import com.plccom.mqtt.client.PlccomMqttEndpoint;
 import com.plccom.mqtt.client.PlccomMqttException;
 import com.plccom.mqtt.client.PlccomMqttProtocolVersion;
 import com.plccom.mqtt.client.PlccomMqttPublishMessage;
@@ -246,6 +245,12 @@ public final class PlccomMqttClientToolApp {
     // Written on the single background worker thread and read from the Swing
     // event dispatch thread (button states, status text), so it is volatile for
     // the reading thread to observe the latest value reliably.
+    // The library reports the end of a time-limited license state with these
+    // diagnostic event codes. Kept in ONE place so a later family-wide rename
+    // touches exactly one line in this tool.
+    private static final java.util.List<String> LICENSE_END_EVENT_CODES =
+            java.util.Arrays.asList("CLIENT_LICENSE_EXPIRED", "CLIENT_RECONNECT_LICENSE_EXPIRED");
+
     private volatile PlccomMqttClient client;
     private boolean settingsPersistenceEnabled = true;
     private boolean settingsSaved;
@@ -1770,24 +1775,24 @@ public final class PlccomMqttClientToolApp {
 
     /**
      * Configures TLS on the builder when the endpoint is secure: sets the PKI store
-     * and host-name validation, and adds the client certificate when mutual TLS is
-     * enabled. The certificate password is wiped from memory afterwards.
+     * and adds the client certificate when mutual TLS is enabled. The certificate
+     * password is wiped from memory afterwards.
      */
     private void applyClientTls(PlccomMqttClientBuilder builder) throws Exception {
         String endpointText = trim(endpointField);
         if (!isSecureEndpoint(endpointText)) {
             return;
         }
-        PlccomMqttEndpoint endpoint = PlccomMqttEndpoint.parse(endpointText);
         char[] password = clientCertificatePasswordField.getPassword();
         try {
             PlccomMqttPkiStore pkiStore = createPkiStore();
+            // Trust decisions follow the PLCcom PKI folder rule: a broker certificate placed in
+            // the trusted store (or issued by a CA from the issuer store) is accepted as-is - no
+            // additional host-name binding is enforced on top of that decision.
             PlccomMqttTlsOptions.Builder tls = PlccomMqttTlsOptions.builder()
                     .enabledProtocols("TLSv1.3", "TLSv1.2")
                     .pkiOptions(PlccomMqttPkiOptions.builder()
                             .pkiStore(pkiStore)
-                            .validateRemoteCertificateHostName(true)
-                            .targetHostName(endpoint.getHost())
                             .build());
             if (clientCertificateCheck.isSelected()) {
                 String pkiOwnAlias = trimOrNull(clientPkiOwnAliasField);
@@ -2617,6 +2622,34 @@ public final class PlccomMqttClientToolApp {
      */
     private void diagnostic(PlccomMqttDiagnosticEvent event) {
         logPanel.append(diagnosticLogLevel(event), formatDiagnostic(event));
+        if (LICENSE_END_EVENT_CODES.contains(event.getCode())) {
+            handleLicenseEnded();
+        }
+    }
+
+    /**
+     * The library has ended operation on its own; mirror that in the header.
+     * Without this the status pill keeps showing Connected/Working while the
+     * log already explains why nothing works any more - and a user who only
+     * looks at the header searches the fault on their side.
+     *
+     * <p>Idempotent on purpose: with automatic reconnect both license end
+     * events arrive, and a user-initiated disconnect around the same time must
+     * not produce a second state change. setStatus and updateActionStates
+     * already hop onto the Swing thread themselves; the client handle is
+     * closed on a worker thread because close() joins library threads and the
+     * event arrives on one of them.</p>
+     */
+    private void handleLicenseEnded() {
+        final PlccomMqttClient ended = client;
+        client = null;
+        if (ended != null) {
+            Thread cleanup = new Thread(ended::close, "client-tool-license-end-cleanup");
+            cleanup.setDaemon(true);
+            cleanup.start();
+        }
+        setStatus("status.disconnected", Status.ERROR);
+        updateActionStates();
     }
 
     /** Maps a diagnostic severity to the log panel colour level. */

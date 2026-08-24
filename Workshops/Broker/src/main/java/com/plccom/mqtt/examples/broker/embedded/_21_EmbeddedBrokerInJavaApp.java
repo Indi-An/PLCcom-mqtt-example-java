@@ -68,10 +68,14 @@ import com.plccom.mqtt.broker.PlccomMqttBrokerFactory;
 public final class _21_EmbeddedBrokerInJavaApp {
 
     // === YOUR PLCcom LICENSE =================================================
-    // Replace both values with the user name and serial from your PLCcom license
-    // e-mail. A broker (or broker+client) license is required.
-    private static final String LICENSE_USER   = "<Enter your UserName here>";
-    private static final String LICENSE_SERIAL = "<Enter your Serial here>";
+    // Important !!!!!!!!!!!!!!!!!!
+    // Enter your Username + Serial here! Please note: passing two empty strings runs the library
+    // for 15 minutes during a debug session. Both values can also come
+    // from configuration or an environment variable.
+    // A broker (or broker+client) license is required for the broker workshops.
+    // Free trial license (14 days, uninterrupted): https://www.indi-an.com/en/plccom/mqtt/mqtt-download/
+    private static final String LICENSE_USER   = "";
+    private static final String LICENSE_SERIAL = "";
     // =========================================================================
 
     private _21_EmbeddedBrokerInJavaApp() {

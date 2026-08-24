@@ -241,6 +241,11 @@ public final class PlccomMqttBrokerToolApp {
     // Written on the single background worker thread and read from the Swing
     // event dispatch thread (button states, status text), so it is volatile for
     // the reading thread to observe the latest value reliably.
+    // The library reports the end of a time-limited license state with this
+    // diagnostic event code. Kept in ONE place so a later family-wide rename
+    // touches exactly one line in this tool.
+    private static final String LICENSE_END_EVENT_CODE = "BROKER_LICENSE_EXPIRED";
+
     private volatile PlccomMqttBroker broker;
     private boolean settingsPersistenceEnabled = true;
     private boolean settingsSaved;
@@ -2310,6 +2315,33 @@ public final class PlccomMqttBrokerToolApp {
     /** Diagnostic callback from the broker: renders the event at a matching log level. */
     private void diagnostic(PlccomMqttDiagnosticEvent event) {
         logPanel.append(logLevelFor(event.getSeverity()), formatDiagnostic(event));
+        if (LICENSE_END_EVENT_CODE.equals(event.getCode())) {
+            handleLicenseEnded();
+        }
+    }
+
+    /**
+     * The library has halted the broker on its own; mirror that in the header.
+     * Without this the status pill keeps showing Running while the log already
+     * explains why no client can connect any more - the same state as if the
+     * user had pressed Stop.
+     *
+     * <p>Idempotent on purpose: a user-initiated stop around the same time
+     * must not produce a second state change. setStatus and updateActionStates
+     * already hop onto the Swing thread themselves; the broker handle is
+     * closed on a worker thread because close() joins library threads and the
+     * event arrives on one of them.</p>
+     */
+    private void handleLicenseEnded() {
+        final PlccomMqttBroker ended = broker;
+        broker = null;
+        if (ended != null) {
+            Thread cleanup = new Thread(ended::close, "broker-tool-license-end-cleanup");
+            cleanup.setDaemon(true);
+            cleanup.start();
+        }
+        setStatus("status.stopped", Status.ERROR);
+        updateActionStates();
     }
 
     /** Maps a diagnostic severity to the log colour level (error/warning/info). */

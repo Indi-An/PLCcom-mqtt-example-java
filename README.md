@@ -153,7 +153,7 @@ The root `pom.xml` is only a reactor — it lists the modules and builds them in
 
 - Java 11 or newer
 - Maven 3.8 or newer
-- A valid PLCcom MQTT license user name and serial number
+- A valid PLCcom MQTT license user name and serial number (see the note in each workshop)
 - A running MQTT broker for the client workshops (a broker workshop, the broker tool, or Mosquitto)
 - A desktop environment for the Swing console and the reference applications
 
@@ -168,19 +168,23 @@ cd PLCcom-mqtt-example-java
 
 ### 2. Add your license credentials
 
-You need a PLCcom MQTT license (a user name and a serial number). Two ways to get one:
-
-- **Free trial** — generate a time-limited trial license on the [PLCcom MQTT download page](https://www.indi-an.com/en/plccom/mqtt/mqtt-download/).
-- **Purchase** — buy a full license on the [PLCcom MQTT buy page](https://www.indi-an.com/en/plccom/mqtt/mqtt-buy/).
-
-Every workshop shows exactly where to put your credentials — a visible block near the top of each class:
+Every workshop shows exactly where the credentials go — a visible block near the top of each class, shipped blank:
 
 ~~~java
-private static final String LICENSE_USER   = "<Enter your UserName here>";
-private static final String LICENSE_SERIAL = "<Enter your Serial here>";
+private static final String LICENSE_USER   = "";
+private static final String LICENSE_SERIAL = "";
 ~~~
 
-Replace both values with the credentials from your license (trial or purchased). A client-only license is enough for the client workshops; broker workshops need a broker (or broker+client) license.
+**You can start without a license.** Those two empty strings are what turns on evaluation mode: the library then runs for 15 minutes during a debug session with the full functional scope — enough to bring up a connection and exchange messages. So you can try the workshops out before you register. (Leaving out the `license(...)` call altogether is a different thing and does not work — evaluation mode has to be asked for.)
+
+When the evaluation period ends, operation stops: an open connection is disconnected and a running broker halts. The same applies when a time-limited license expires. The library never terminates your application.
+
+For uninterrupted work you need a PLCcom MQTT license (a user name and a serial number). Two ways to get one:
+
+- **Free trial** — generate a 14-day trial license on the [PLCcom MQTT download page](https://www.indi-an.com/en/plccom/mqtt/mqtt-download/).
+- **Purchase** — buy a full license on the [PLCcom MQTT buy page](https://www.indi-an.com/en/plccom/mqtt/mqtt-buy/).
+
+Fill both values in from your license (trial or purchased). A client-only license is enough for the client workshops; broker workshops need a broker (or broker+client) license. Both values can also come from configuration or an environment variable — license data does not belong in source code you publish.
 
 ### 3. Build
 

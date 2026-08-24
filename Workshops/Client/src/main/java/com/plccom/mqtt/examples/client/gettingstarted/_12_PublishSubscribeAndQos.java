@@ -73,10 +73,14 @@ import com.plccom.mqtt.client.PlccomMqttPublishMessage;
 public final class _12_PublishSubscribeAndQos {
 
     // === YOUR PLCcom LICENSE =================================================
-    // Replace both values with the user name and serial from your PLCcom license
-    // e-mail. A client-only license is sufficient for the client workshops.
-    private static final String LICENSE_USER   = "<Enter your UserName here>";
-    private static final String LICENSE_SERIAL = "<Enter your Serial here>";
+    // Important !!!!!!!!!!!!!!!!!!
+    // Enter your Username + Serial here! Please note: passing two empty strings runs the library
+    // for 15 minutes during a debug session. Both values can also come
+    // from configuration or an environment variable.
+    // A client-only license is sufficient for the client workshops.
+    // Free trial license (14 days, uninterrupted): https://www.indi-an.com/en/plccom/mqtt/mqtt-download/
+    private static final String LICENSE_USER   = "";
+    private static final String LICENSE_SERIAL = "";
     // =========================================================================
 
     // === BROKER TO CONNECT TO ================================================

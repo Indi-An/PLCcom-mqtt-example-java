@@ -7,11 +7,14 @@ Twelve hands-on workshops for the **high-level PLCcom MQTT client**, grouped int
 Every workshop follows the same readable shape, so once you know one you know them all:
 
 1. **MIT header** and a plain-English class comment (*what · when · MQTT terms · expected result*).
-2. A **visible license block** — this is where you paste your credentials:
+2. A **visible license block**, shipped blank — this is where your credentials go:
    ~~~java
-   private static final String LICENSE_USER   = "<Enter your UserName here>";
-   private static final String LICENSE_SERIAL = "<Enter your Serial here>";
+   private static final String LICENSE_USER   = "";
+   private static final String LICENSE_SERIAL = "";
    ~~~
+
+   Those two empty strings are what turns on evaluation mode: the workshop then runs for 15 minutes during a debug session with the full functional scope. When the evaluation period ends, operation stops: an open connection is disconnected and a running broker halts — the same applies when a time-limited license expires, and the library never terminates your application. Fill both values in for uninterrupted work — free trial license (14 days): https://www.indi-an.com/en/plccom/mqtt/mqtt-download/
+
 3. A **visible broker endpoint** you can change or override:
    ~~~java
    private static final String BROKER_ENDPOINT = "mqtt://localhost:1883";

@@ -25,4 +25,4 @@ mvn -f Reference_Applications/Broker/pom.xml package
 javaw -jar Reference_Applications/Broker/target/plccom-mqtt-tools-broker-1.0.0.jar
 ~~~
 
-Enter your PLCcom MQTT license in the application when prompted. This is a reference/testing application — see the [Safety Notice](../../README.md#-safety-notice) before using it against real equipment.
+Enter your PLCcom MQTT license in the application when prompted. Passing two empty strings runs the application for 15 minutes during a debug session (evaluation mode); when that period ends, operation stops and the application is disconnected — the same applies when a time-limited license expires, and the library never terminates it. For uninterrupted work generate a free trial license (14 days) at https://www.indi-an.com/en/plccom/mqtt/mqtt-download/. This is a reference/testing application — see the [Safety Notice](../../README.md#-safety-notice) before using it against real equipment.

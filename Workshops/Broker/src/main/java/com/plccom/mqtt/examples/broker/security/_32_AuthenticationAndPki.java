@@ -65,7 +65,7 @@ import com.plccom.mqtt.broker.PlccomMqttBrokerSubscriptionContext;
  *   - Enhanced Authentication: MQTT 5 AUTH exchange with an application method.
  *   - Certificate / mTLS     : the TLS listener requires a client certificate.
  *   - PKI store              : folders the broker uses to validate certificates -
- *                              trusted, issuers, rejected and its own identity.
+ *                              trusted, issuer, rejected and its own identity.
  *
  * EXPECTED RESULT
  *   Valid credentials and a valid token are accepted; invalid ones are rejected
@@ -74,10 +74,14 @@ import com.plccom.mqtt.broker.PlccomMqttBrokerSubscriptionContext;
 public final class _32_AuthenticationAndPki {
 
     // === YOUR PLCcom LICENSE =================================================
-    // Replace both values with the user name and serial from your PLCcom license
-    // e-mail. A broker (or broker+client) license is required.
-    private static final String LICENSE_USER   = "<Enter your UserName here>";
-    private static final String LICENSE_SERIAL = "<Enter your Serial here>";
+    // Important !!!!!!!!!!!!!!!!!!
+    // Enter your Username + Serial here! Please note: passing two empty strings runs the library
+    // for 15 minutes during a debug session. Both values can also come
+    // from configuration or an environment variable.
+    // A broker (or broker+client) license is required for the broker workshops.
+    // Free trial license (14 days, uninterrupted): https://www.indi-an.com/en/plccom/mqtt/mqtt-download/
+    private static final String LICENSE_USER   = "";
+    private static final String LICENSE_SERIAL = "";
     // =========================================================================
 
     private static final String AUTH_METHOD = "plccom.token";
@@ -118,7 +122,7 @@ public final class _32_AuthenticationAndPki {
         System.out.println("║  Username/password: checked in the access validator's CONNECT decision.    ║");
         System.out.println("║  Enhanced Auth: an optional MQTT 5 challenge method your own code owns.    ║");
         System.out.println("║  Certificate / mTLS: a TLS listener can require a client certificate,      ║");
-        System.out.println("║  validated against a PKI store (trusted / issuers / rejected / own) - see  ║");
+        System.out.println("║  validated against a PKI store (trusted / issuer / rejected / own) - see   ║");
         System.out.println("║  Broker Workshop 13 for the TLS server side.                               ║");
         System.out.println("║                                                                            ║");
         System.out.println("║  Passwords and secrets are never logged.                                   ║");
@@ -176,7 +180,7 @@ public final class _32_AuthenticationAndPki {
             // -- Step 4: certificate / mTLS note ------------------------------
             // Certificate authentication is configured on the TLS listener, not
             // here: the listener requests a client certificate and validates it
-            // against the PKI store (trusted / issuers / rejected / own folders).
+            // against the PKI store (trusted / issuer / rejected / own folders).
             // See Broker Workshop 13 for starting TLS listeners and providing the
             // server certificate; the same TLS options carry the client-certificate
             // mode and PKI validation for mTLS.
