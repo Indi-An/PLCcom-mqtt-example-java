@@ -56,7 +56,7 @@
           <tr><td><code>OPTIONAL</code></td><td>Ein Client-Zertifikat wird angefordert; Verbindungen ohne Zertifikat werden trotzdem akzeptiert. Der Access Validator kann dann beim MQTT CONNECT gezielt ablehnen.</td></tr>
           <tr><td><code>REQUIRED</code></td><td>Ohne Client-Zertifikat scheitert bereits der TLS-Handshake - noch vor MQTT CONNECT. Richtig fuer harte mTLS-Ports.</td></tr>
         </table>
-        <p>Unbekannte Client-Zertifikate werden im Broker-PKI-Store unter <code>rejected/certs</code> abgelegt und koennen anschliessend vertraut werden.</p>
+        <p>Unbekannte Client-Zertifikate werden im Broker-PKI-Store unter <code>rejected/certs</code> abgelegt und koennen anschliessend vertraut werden. Ein Zertifikat in <code>trusted</code> gilt nur fuer sich selbst, auch wenn es eine CA ist. Soll eine CA fuer die von ihr ausgestellten Client-Zertifikate buergen, gehoert sie nach <code>issuer</code>.</p>
         <p>Wichtig: Der PKI-Store beantwortet nur die technische Frage, ob ein Zertifikat vertraut ist. Die fachliche Anmeldung eines Benutzers geschieht danach im Access Validator, der Subject, Issuer, Seriennummer und Fingerprint auswerten kann. Die Access-Regel <strong>Benutzerzertifikat verlangen</strong> ist deshalb nicht dasselbe wie der TLS-Modus <code>REQUIRED</code>.</p>
         <div class="warning">Wenn der Client-Zertifikatsmodus <code>REQUIRED</code> ist und der Client kein Zertifikat sendet, bricht der TLS-Handshake ab. Das ist korrektes Verhalten.</div>
       </section>

@@ -69,8 +69,11 @@ import com.plccom.mqtt.pki.PlccomMqttRemoteCertificateValidationResult;
  *                             presented so the broker can authenticate the client.
  *   - Hostname/SAN check    : verifies that the broker certificate contains the
  *                             endpoint host as DNS or IP subject alternative name.
- *                             Trust alone is not enough: a trusted certificate
- *                             for a different host is still rejected.
+ *                             With the Trust Store used here, trust alone is
+ *                             not enough: a trusted certificate for a different
+ *                             host is still rejected. (Certificates accepted
+ *                             through the PLCcom PKI folder are trusted without
+ *                             a host-name match - put only your own CA there.)
  *   - Custom validator      : instead of a Trust Store you can plug in your OWN
  *                             remote-certificate validator (for example certificate
  *                             pinning) via PlccomMqttPkiOptions. Toggle it with
