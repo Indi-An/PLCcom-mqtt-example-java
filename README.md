@@ -132,18 +132,18 @@ The examples use the PLCcom MQTT Java packages:
 <dependency>
     <groupId>com.indi-an.plccom</groupId>
     <artifactId>plccom-mqtt-client</artifactId>
-    <version>2.1.2</version>
+    <version>3.x.x</version>
 </dependency>
 
 <!-- Broker-side applications -->
 <dependency>
     <groupId>com.indi-an.plccom</groupId>
     <artifactId>plccom-mqtt-broker</artifactId>
-    <version>2.1.2</version>
+    <version>3.x.x</version>
 </dependency>
 ~~~
 
-Both artifacts are on Maven Central and pull in `plccom-mqtt-core` (and gson) transitively, so you only declare the side you use.
+Replace `3.x.x` with the PLCcom MQTT release you use. Both artifacts are on Maven Central and pull in `plccom-mqtt-core` transitively, so you only declare the side you use.
 
 **Each module is self-contained.** Open any module's own `pom.xml` and the SDK version is written right there, at the dependency — there is no hidden parent that controls it. To target another PLCcom MQTT release, change the `<version>` in the module you build (the workshop or reference-application module you are using).
 
@@ -151,7 +151,7 @@ The root `pom.xml` is only a reactor — it lists the modules and builds them in
 
 ## 🧰 Requirements
 
-- Java 11 or newer
+- Java 11 to Java 27
 - Maven 3.8 or newer
 - A valid PLCcom MQTT license user name and serial number (see the note in each workshop)
 - A running MQTT broker for the client workshops (a broker workshop, the broker tool, or Mosquitto)
