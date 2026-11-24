@@ -263,6 +263,13 @@ The two Swing tools are complete, clickable versions of the same features:
 
 Both ship with a German/English interface and integrated help.
 
+## 🆓 Free tools built with this SDK
+
+Free Windows tools for testing and commissioning, built with this library:
+
+- [PLCcom MQTT Client Tool](https://www.indi-an.com/en/plccom/mqtt/mqtt-client-tool/)
+- [PLCcom MQTT Standalone Broker](https://www.indi-an.com/en/plccom/mqtt/mqtt-standalone-broker/)
+
 ## 📚 Documentation
 
 The complete PLCcom MQTT documentation lives at **[docs.plccom.net](https://docs.plccom.net/)**.
